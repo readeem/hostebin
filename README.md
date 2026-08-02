@@ -42,13 +42,6 @@ go install github.com/readeem/hostebin/cmd/hostebin@latest
 ```
 
 </td></tr>
-<tr><th>Arch (yay)</th><td>
-
-```sh
-yay -S hostebin-bin
-```
-
-</td></tr>
 <tr><th>Debian/Ubuntu</th><td>
 
 ```sh
