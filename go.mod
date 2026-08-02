@@ -4,6 +4,7 @@ go 1.26.5
 
 require (
 	github.com/peterbourgon/ff/v3 v3.4.0
+	github.com/rs/zerolog v1.35.1
 	github.com/yuin/goldmark v1.8.5
 	golang.org/x/crypto v0.54.0
 	tailscale.com v1.102.0
@@ -27,6 +28,8 @@ require (
 	github.com/huin/goupnp v1.3.0 // indirect
 	github.com/jsimonetti/rtnetlink v1.4.1 // indirect
 	github.com/klauspost/compress v1.19.1 // indirect
+	github.com/mattn/go-colorable v0.1.15 // indirect
+	github.com/mattn/go-isatty v0.0.23 // indirect
 	github.com/mdlayher/netlink v1.7.3-0.20250113171957-fbb4dce95f42 // indirect
 	github.com/mdlayher/socket v0.5.0 // indirect
 	github.com/mitchellh/go-ps v1.0.0 // indirect

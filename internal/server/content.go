@@ -57,7 +57,7 @@ func (s *Server) serveFile(w http.ResponseWriter, r *http.Request, meta *store.B
 	if !raw && (ext == ".md" || ext == ".markdown") {
 		w.Header().Set("Content-Type", "text/html; charset=utf-8")
 		if err := s.renderer.renderMarkdown(w, name, f); err != nil {
-			s.cfg.Logger.Error("render markdown", "error", err)
+			s.cfg.Logger.Error().Err(err).Msg("render markdown")
 		}
 		return
 	}
@@ -90,7 +90,7 @@ func (s *Server) serveListing(w http.ResponseWriter, _ *http.Request, meta *stor
 	}
 	description := fmt.Sprintf("%d files · %s", len(meta.Files), humanBytes(meta.Bytes))
 	if err := s.renderer.renderListing(w, meta.Title, description, files); err != nil {
-		s.cfg.Logger.Error("render listing", "error", err)
+		s.cfg.Logger.Error().Err(err).Msg("render listing")
 	}
 }
 

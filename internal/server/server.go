@@ -6,13 +6,15 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
-	"log/slog"
 	"net/http"
 	"net/url"
+	"os"
 	"strings"
 	"time"
 
+	"github.com/readeem/hostebin/internal/logging"
 	"github.com/readeem/hostebin/internal/store"
+	"github.com/rs/zerolog"
 )
 
 const DefaultCSP = "default-src 'self' data: blob: https: 'unsafe-inline' 'unsafe-eval'; connect-src 'self'; form-action 'none'; frame-ancestors 'none'"
@@ -24,7 +26,7 @@ type Config struct {
 	MaxFiles   int
 	DefaultTTL time.Duration
 	CSP        string
-	Logger     *slog.Logger
+	Logger     *zerolog.Logger
 }
 
 type Server struct {
@@ -50,7 +52,7 @@ func New(cfg Config) (*Server, error) {
 		cfg.CSP = DefaultCSP
 	}
 	if cfg.Logger == nil {
-		cfg.Logger = slog.Default()
+		cfg.Logger = logging.NewConsole(os.Stderr)
 	}
 	renderer, err := newRenderer()
 	if err != nil {

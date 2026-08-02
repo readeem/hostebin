@@ -8,7 +8,6 @@ import (
 	"flag"
 	"fmt"
 	"io"
-	"log/slog"
 	"net"
 	"net/http"
 	"os"
@@ -20,6 +19,7 @@ import (
 	"time"
 
 	"github.com/readeem/hostebin/internal/listen"
+	"github.com/readeem/hostebin/internal/logging"
 	"github.com/readeem/hostebin/internal/server"
 	"github.com/readeem/hostebin/internal/store"
 )
@@ -40,39 +40,39 @@ func runServe(args []string, stderr io.Writer) int {
 		fmt.Fprintln(stderr, "usage: hostebin serve [flags]")
 		return exitUsage
 	}
-	logger := slog.New(slog.NewTextHandler(stderr, nil))
+	logger := logging.NewConsole(stderr)
 	httpAddr, err := httpListenAddr(cfg.HTTPHost, cfg.HTTPPort)
 	if err != nil {
-		logger.Error("invalid HTTP listener", "error", err)
+		logger.Error().Err(err).Msg("invalid HTTP listener")
 		return exitUsage
 	}
 	st, err := store.New(cfg.Data)
 	if err != nil {
-		logger.Error("initialize storage", "error", err)
+		logger.Error().Err(err).Msg("initialize storage")
 		return exitNetwork
 	}
 	token, generated, err := loadOrCreateToken(st.DataDir(), cfg.Token)
 	if err != nil {
-		logger.Error("initialize token", "error", err)
+		logger.Error().Err(err).Msg("initialize token")
 		return exitNetwork
 	}
 	if generated {
-		logger.Info("generated upload token", "token", token, "path", filepath.Join(st.DataDir(), "token"))
+		logger.Info().Str("token", token).Str("path", filepath.Join(st.DataDir(), "token")).Msg("generated upload token")
 	}
 	maxUpload, err := parseBytes(cfg.MaxUpload)
 	if err != nil {
-		logger.Error("invalid max-upload", "error", err)
+		logger.Error().Err(err).Msg("invalid max-upload")
 		return exitUsage
 	}
 	if cfg.MaxFiles <= 0 {
-		logger.Error("max-files must be positive")
+		logger.Error().Msg("max-files must be positive")
 		return exitUsage
 	}
 	var defaultTTL time.Duration
 	if raw := cfg.DefaultTTL; raw != "" && !strings.EqualFold(raw, "never") {
 		defaultTTL, err = server.ParseDuration(raw)
 		if err != nil || defaultTTL <= 0 {
-			logger.Error("invalid default-ttl")
+			logger.Error().Msg("invalid default-ttl")
 			return exitUsage
 		}
 	}
@@ -82,14 +82,14 @@ func runServe(args []string, stderr io.Writer) int {
 	}
 	app, err := server.New(server.Config{Store: st, Token: token, MaxUpload: maxUpload, MaxFiles: cfg.MaxFiles, DefaultTTL: defaultTTL, CSP: csp, Logger: logger})
 	if err != nil {
-		logger.Error("initialize server", "error", err)
+		logger.Error().Err(err).Msg("initialize server")
 		return exitNetwork
 	}
 	ctx, cancel := signal.NotifyContext(context.Background(), os.Interrupt, syscall.SIGTERM)
 	defer cancel()
-	listeners, err := listen.Build(ctx, listen.Config{Addr: httpAddr, BaseURL: cfg.BaseURL, TLSAddr: cfg.TLSAddr, TLSCert: cfg.TLSCert, TLSKey: cfg.TLSKey, ACMEDomain: cfg.ACMEDomain, ACMEEmail: cfg.ACMEEmail, DataDir: st.DataDir(), Tailscale: cfg.Tailscale || cfg.Funnel, Funnel: cfg.Funnel, TSHostname: cfg.TSHostname, TSAuthKey: cfg.TSAuthKey, Logf: func(format string, values ...any) { logger.Info(fmt.Sprintf(format, values...)) }})
+	listeners, err := listen.Build(ctx, listen.Config{Addr: httpAddr, BaseURL: cfg.BaseURL, TLSAddr: cfg.TLSAddr, TLSCert: cfg.TLSCert, TLSKey: cfg.TLSKey, ACMEDomain: cfg.ACMEDomain, ACMEEmail: cfg.ACMEEmail, DataDir: st.DataDir(), Tailscale: cfg.Tailscale || cfg.Funnel, Funnel: cfg.Funnel, TSHostname: cfg.TSHostname, TSAuthKey: cfg.TSAuthKey, Logf: func(format string, values ...any) { logger.Info().Msgf(format, values...) }})
 	if err != nil {
-		logger.Error("initialize listeners", "error", err)
+		logger.Error().Err(err).Msg("initialize listeners")
 		return exitNetwork
 	}
 	defer listeners.Close()
@@ -97,9 +97,9 @@ func runServe(args []string, stderr io.Writer) int {
 	defer close(gcStop)
 	go st.RunGC(gcStop, 10*time.Minute, func(n int, err error) {
 		if err != nil {
-			logger.Error("garbage collection", "error", err)
+			logger.Error().Err(err).Msg("garbage collection")
 		} else if n > 0 {
-			logger.Info("removed expired bundles", "count", n)
+			logger.Info().Int("count", n).Msg("removed expired bundles")
 		}
 	})
 	errCh := make(chan error, len(listeners.Endpoints))
@@ -114,7 +114,7 @@ func runServe(args []string, stderr io.Writer) int {
 		}
 		httpServer := &http.Server{Handler: handler, ReadHeaderTimeout: 10 * time.Second}
 		servers = append(servers, httpServer)
-		logger.Info("listening", "address", endpoint.Listener.Addr().String(), "base_url", endpoint.BaseURL)
+		logger.Info().Str("address", endpoint.Listener.Addr().String()).Str("base_url", endpoint.BaseURL).Msg("listening")
 		go func(ln net.Listener) { errCh <- httpServer.Serve(ln) }(endpoint.Listener)
 	}
 	select {
@@ -127,7 +127,7 @@ func runServe(args []string, stderr io.Writer) int {
 		return exitOK
 	case err := <-errCh:
 		if !errors.Is(err, http.ErrServerClosed) && !errors.Is(err, net.ErrClosed) {
-			logger.Error("serve", "error", err)
+			logger.Error().Err(err).Msg("serve")
 			return exitNetwork
 		}
 		return exitOK
