@@ -42,25 +42,10 @@ go install github.com/readeem/hostebin/cmd/hostebin@latest
 ```
 
 </td></tr>
-<tr><th>Homebrew<br>(macOS, Linux)</th><td>
-
-```sh
-brew install readeem/tap/hostebin
-```
-
-</td></tr>
 <tr><th>Arch (yay)</th><td>
 
 ```sh
 yay -S hostebin-bin
-```
-
-</td></tr>
-<tr><th>Scoop<br>(Windows)</th><td>
-
-```powershell
-scoop bucket add readeem https://github.com/readeem/scoop-bucket
-scoop install hostebin
 ```
 
 </td></tr>
