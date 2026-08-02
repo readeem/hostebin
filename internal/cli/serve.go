@@ -33,7 +33,7 @@ func runServe(args []string, stderr io.Writer) int {
 	fs := flag.NewFlagSet("serve", flag.ContinueOnError)
 	fs.SetOutput(stderr)
 	cfg.registerServeFlags(fs)
-	
+
 	if err := parseConfig(fs, args); err != nil {
 		return exitUsage
 	}

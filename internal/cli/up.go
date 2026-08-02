@@ -75,7 +75,7 @@ func runUp(args []string, stdin io.Reader, stdout, stderr io.Writer) int {
 	pipeReader, pipeWriter := io.Pipe()
 	mw := multipart.NewWriter(pipeWriter)
 	writeErr := make(chan error, 1)
-	
+
 	go func() {
 		defer close(writeErr)
 		for key, value := range map[string]string{"title": title, "ttl": ttl, "entry": entry} {
