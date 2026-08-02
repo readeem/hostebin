@@ -6,14 +6,36 @@ import (
 	"io"
 	"os"
 	"path/filepath"
+	"runtime"
 	"testing"
 )
 
+// setUserConfigRoot points os.UserConfigDir at root for the duration of the
+// test. Each platform reads a different variable, so setting XDG_CONFIG_HOME
+// alone would silently leave macOS and Windows writing to the real user
+// configuration directory.
+func setUserConfigRoot(t *testing.T, root string) {
+	t.Helper()
+	switch runtime.GOOS {
+	case "windows":
+		t.Setenv("AppData", root)
+	case "darwin", "ios":
+		t.Setenv("HOME", root)
+	default:
+		t.Setenv("XDG_CONFIG_HOME", root)
+	}
+}
+
 func TestNewConfigUsesGlobalDirectoriesAndAutogeneratesJSON(t *testing.T) {
-	configRoot := t.TempDir()
 	dataRoot := t.TempDir()
-	t.Setenv("XDG_CONFIG_HOME", configRoot)
 	t.Setenv("XDG_DATA_HOME", dataRoot)
+	// os.UserConfigDir reads a different variable per platform, so redirect the
+	// one that applies here and derive the expectation from the same rule.
+	setUserConfigRoot(t, t.TempDir())
+	configRoot, err := os.UserConfigDir()
+	if err != nil {
+		t.Fatal(err)
+	}
 
 	cfg, err := NewConfig()
 	if err != nil {

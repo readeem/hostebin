@@ -143,24 +143,8 @@ func (s *Store) write(id string, opts Options, files []File, updating bool, mode
 		}
 	}
 	if old != nil && mode == "merge" {
-		root, err := os.OpenRoot(filepath.Join(s.bundleDir(id), "files"))
-		if err != nil {
+		if err := copyKeptFiles(s.bundleDir(id), tmp, old.Files, names, &meta.Files); err != nil {
 			return nil, err
-		}
-		defer root.Close()
-		for _, existing := range old.Files {
-			if names[existing.Name] {
-				continue
-			}
-			in, err := root.Open(existing.Name)
-			if err != nil {
-				return nil, fmt.Errorf("read existing %s: %w", existing.Name, err)
-			}
-			if err := writeFile(filepath.Join(tmp, "files"), existing.Name, in, existing.ContentType, &meta.Files); err != nil {
-				in.Close()
-				return nil, err
-			}
-			in.Close()
 		}
 	}
 	for _, file := range files {
@@ -202,6 +186,33 @@ func (s *Store) write(id string, opts Options, files []File, updating bool, mode
 	}
 	_ = os.RemoveAll(trash)
 	return meta, nil
+}
+
+// copyKeptFiles stages the files a merge leaves untouched. It releases its
+// handles on the live bundle before returning, because Windows refuses to
+// rename a directory while anything inside it is still open, and the caller
+// renames this bundle away immediately afterwards.
+func copyKeptFiles(bundleDir, tmp string, existing []FileMeta, replaced map[string]bool, metas *[]FileMeta) error {
+	root, err := os.OpenRoot(filepath.Join(bundleDir, "files"))
+	if err != nil {
+		return err
+	}
+	defer root.Close()
+	for _, file := range existing {
+		if replaced[file.Name] {
+			continue
+		}
+		in, err := root.Open(file.Name)
+		if err != nil {
+			return fmt.Errorf("read existing %s: %w", file.Name, err)
+		}
+		err = writeFile(filepath.Join(tmp, "files"), file.Name, in, file.ContentType, metas)
+		in.Close()
+		if err != nil {
+			return err
+		}
+	}
+	return nil
 }
 
 func writeFile(root, name string, src io.Reader, contentType string, metas *[]FileMeta) error {

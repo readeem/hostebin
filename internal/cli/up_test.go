@@ -30,7 +30,7 @@ func TestUpStdoutAndJSON(t *testing.T) {
 	ts := cliTestServer(t)
 	t.Setenv("HOSTEBIN_SERVER", ts.URL)
 	t.Setenv("HOSTEBIN_TOKEN", "cli-token")
-	t.Setenv("XDG_CONFIG_HOME", t.TempDir())
+	setUserConfigRoot(t, t.TempDir())
 	file := filepath.Join(t.TempDir(), "plan.html")
 	if err := os.WriteFile(file, []byte("<b>ok</b>"), 0o600); err != nil {
 		t.Fatal(err)
@@ -58,7 +58,7 @@ func TestUpStdinRequiresNameAndUploads(t *testing.T) {
 	ts := cliTestServer(t)
 	t.Setenv("HOSTEBIN_SERVER", ts.URL)
 	t.Setenv("HOSTEBIN_TOKEN", "cli-token")
-	t.Setenv("XDG_CONFIG_HOME", t.TempDir())
+	setUserConfigRoot(t, t.TempDir())
 	var stdout, stderr bytes.Buffer
 	if code := Run([]string{"up", "-"}, strings.NewReader("# hi"), &stdout, &stderr); code != exitUsage {
 		t.Fatalf("unnamed stdin code = %d", code)
