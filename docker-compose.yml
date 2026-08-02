@@ -1,0 +1,27 @@
+services:
+  plain:
+    profiles: [plain]
+    build: .
+    restart: unless-stopped
+    ports:
+      - "8080:8080"
+    environment:
+      HOSTEBIN_TOKEN: ${HOSTEBIN_TOKEN:-}
+    volumes:
+      - hostebin-plain:/data
+
+  tailscale:
+    profiles: [tailscale]
+    build: .
+    restart: unless-stopped
+    command: ["serve", "--addr=", "--tailscale", "--data", "/data"]
+    environment:
+      TS_AUTHKEY: ${TS_AUTHKEY:-}
+      HOSTEBIN_TOKEN: ${HOSTEBIN_TOKEN:-}
+      HOSTEBIN_TS_HOSTNAME: ${HOSTEBIN_TS_HOSTNAME:-hostebin}
+    volumes:
+      - hostebin-tailscale:/data
+
+volumes:
+  hostebin-plain:
+  hostebin-tailscale:
