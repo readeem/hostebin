@@ -8,14 +8,14 @@ The same static Go binary is the server and the client. Storage is a directory, 
 
 ```sh
 go build -o hostebin ./cmd/hostebin
-./hostebin serve --addr :8080 --data ./data
+./hostebin serve
 ```
 
-On first start, the server creates `./data/token` with mode `0600` and logs the generated token once. In another shell:
+By default, persistent data is stored in the user's global data directory. On Linux that is `${XDG_DATA_HOME:-$HOME/.local/share}/hostebin`. On first start, the server creates `token` there with mode `0600` and logs it once. In another shell:
 
 ```sh
-export HOSTEBIN_URL=http://localhost:8080
-export HOSTEBIN_TOKEN="$(cat ./data/token)"
+export HOSTEBIN_SERVER=http://localhost:8080
+export HOSTEBIN_TOKEN="$(cat "${XDG_DATA_HOME:-$HOME/.local/share}/hostebin/token")"
 
 URL=$(./hostebin up plan.html)
 printf '%s\n' "$URL"
@@ -46,7 +46,7 @@ The `up` flags are:
 --json             emit the JSON response
 --id ID            replace an existing bundle in place
 --open             open the URL in the system browser
---server URL       override HOSTEBIN_URL/config
+--server URL       override HOSTEBIN_SERVER/config
 --token TOKEN      override HOSTEBIN_TOKEN/config
 --quiet            suppress optional diagnostics
 -n, --name PATH    name used for stdin
@@ -54,10 +54,32 @@ The `up` flags are:
 
 List and remove bundles with `hostebin ls` and `hostebin rm ID`. Both accept `--server` and `--token`; `ls --json` returns unmodified structured metadata.
 
-Client configuration precedence is flags, then `HOSTEBIN_URL`/`HOSTEBIN_TOKEN`, then `$XDG_CONFIG_HOME/hostebin/config.json`:
+On first use, `serve`, `up`, `ls`, or `rm` creates a JSON configuration file in the user's global config directory with mode `0600`. On Linux its default path is `${XDG_CONFIG_HOME:-$HOME/.config}/hostebin/config.json`. macOS uses `~/Library/Application Support/hostebin`, and Windows uses the directory returned by `%AppData%`. Use `--config PATH` or `HOSTEBIN_CONFIG` to select another file.
+
+Configuration precedence is command-line flags, then `HOSTEBIN_*` environment variables, then JSON, then built-in defaults. JSON keys are the long flag names:
 
 ```json
-{"url":"https://hostebin.example.com","token":"replace-me"}
+{
+  "server": "https://hostebin.example.com",
+  "token": "replace-me",
+  "host": "",
+  "port": 8080,
+  "data": "/home/me/.local/share/hostebin",
+  "base-url": "",
+  "tls-addr": ":8443",
+  "tls-cert": "",
+  "tls-key": "",
+  "acme-domain": "",
+  "acme-email": "",
+  "tailscale": false,
+  "funnel": false,
+  "ts-hostname": "hostebin",
+  "ts-auth-key": "",
+  "max-upload": "32MiB",
+  "max-files": 64,
+  "default-ttl": "never",
+  "csp": ""
+}
 ```
 
 ## HTTP API
@@ -68,12 +90,12 @@ All `/api/v1` routes require `Authorization: Bearer TOKEN`. Bundle content and `
 curl -sf -H "Authorization: Bearer $HOSTEBIN_TOKEN" \
   -H 'X-Hostebin-Filename: plan.html' \
   --data-binary @plan.html \
-  "$HOSTEBIN_URL/api/v1/bundles"
+  "$HOSTEBIN_SERVER/api/v1/bundles"
 
 curl -sf -H "Authorization: Bearer $HOSTEBIN_TOKEN" \
   -F 'file=@plan.html;filename=plan.html' \
   -F 'file=@img/diagram.png;filename=img/diagram.png' \
-  "$HOSTEBIN_URL/api/v1/bundles"
+  "$HOSTEBIN_SERVER/api/v1/bundles"
 ```
 
 Routes:
@@ -94,26 +116,26 @@ Raw requests can also set `X-Hostebin-Title`, `X-Hostebin-Entry`, and `X-Hostebi
 Plain HTTP is enabled by default on `:8080`:
 
 ```sh
-hostebin serve --addr :8080 --data /var/lib/hostebin
+hostebin serve --host 0.0.0.0 --port 8080 --data /var/lib/hostebin
 ```
 
 Use an existing certificate independently or alongside HTTP:
 
 ```sh
-hostebin serve --addr= --tls-addr :8443 --tls-cert cert.pem --tls-key key.pem
+hostebin serve --port 0 --tls-addr :8443 --tls-cert cert.pem --tls-key key.pem
 ```
 
 Automatic public HTTPS uses Let's Encrypt and owns ports 80 and 443. Port 80 serves ACME challenges and redirects other requests:
 
 ```sh
-hostebin serve --addr= --acme-domain files.example.com --acme-email ops@example.com
+hostebin serve --port 0 --acme-domain files.example.com --acme-email ops@example.com
 ```
 
 Embedded Tailscale needs neither `tailscaled`, `/dev/net/tun`, nor `NET_ADMIN`:
 
 ```sh
-TS_AUTHKEY=tskey-auth-... hostebin serve --addr= --tailscale
-TS_AUTHKEY=tskey-auth-... hostebin serve --addr= --funnel
+HOSTEBIN_TS_AUTH_KEY=tskey-auth-... hostebin serve --port 0 --tailscale
+HOSTEBIN_TS_AUTH_KEY=tskey-auth-... hostebin serve --port 0 --funnel
 ```
 
 The server tries tailnet HTTPS first and logs an HTTP fallback when HTTPS is not enabled for the tailnet. State is persistent under `$HOSTEBIN_DATA/tsnet`. `--funnel` exposes the HTTPS listener publicly according to the tailnet policy.
@@ -124,15 +146,20 @@ Relevant environment variables:
 
 | Variable | Default |
 | --- | --- |
-| `HOSTEBIN_DATA` | `./data` |
+| `HOSTEBIN_CONFIG` | global user config path |
+| `HOSTEBIN_DATA` | global user data directory |
+| `HOSTEBIN_HOST` | all interfaces |
+| `HOSTEBIN_PORT` | `8080`; `0` disables plain HTTP |
 | `HOSTEBIN_TOKEN` | token file, generated when absent |
 | `HOSTEBIN_MAX_UPLOAD` | `32MiB` |
 | `HOSTEBIN_MAX_FILES` | `64` |
-| `HOSTEBIN_DEFAULT_TTL` | no expiry |
+| `HOSTEBIN_DEFAULT_TTL` | `never` |
 | `HOSTEBIN_CSP` | built-in policy; `off` disables it |
-| `HOSTEBIN_TS` | disabled |
+| `HOSTEBIN_TAILSCALE` | disabled |
 | `HOSTEBIN_TS_HOSTNAME` | `hostebin` |
-| `TS_AUTHKEY` | unset |
+| `HOSTEBIN_TS_AUTH_KEY` | unset |
+
+Every long flag has a corresponding `HOSTEBIN_` variable formed by uppercasing its name and replacing hyphens with underscores.
 
 Expired bundles return 404 immediately. A sweep runs at startup and every ten minutes to reclaim their files.
 
@@ -143,7 +170,7 @@ docker build -t hostebin .
 docker run --rm -p 8080:8080 -v hostebin-data:/data hostebin
 
 HOSTEBIN_TOKEN=choose-a-secret docker compose --profile plain up --build
-TS_AUTHKEY=tskey-auth-... HOSTEBIN_TOKEN=choose-a-secret docker compose --profile tailscale up --build
+HOSTEBIN_TS_AUTH_KEY=tskey-auth-... HOSTEBIN_TOKEN=choose-a-secret docker compose --profile tailscale up --build
 ```
 
 The image is built with `CGO_ENABLED=0` and runs as the distroless non-root user. The Tailscale Compose service has no elevated capabilities or host tunnel device.

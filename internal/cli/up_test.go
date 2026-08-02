@@ -28,7 +28,7 @@ func cliTestServer(t *testing.T) *httptest.Server {
 
 func TestUpStdoutAndJSON(t *testing.T) {
 	ts := cliTestServer(t)
-	t.Setenv("HOSTEBIN_URL", ts.URL)
+	t.Setenv("HOSTEBIN_SERVER", ts.URL)
 	t.Setenv("HOSTEBIN_TOKEN", "cli-token")
 	t.Setenv("XDG_CONFIG_HOME", t.TempDir())
 	file := filepath.Join(t.TempDir(), "plan.html")
@@ -56,7 +56,7 @@ func TestUpStdoutAndJSON(t *testing.T) {
 
 func TestUpStdinRequiresNameAndUploads(t *testing.T) {
 	ts := cliTestServer(t)
-	t.Setenv("HOSTEBIN_URL", ts.URL)
+	t.Setenv("HOSTEBIN_SERVER", ts.URL)
 	t.Setenv("HOSTEBIN_TOKEN", "cli-token")
 	t.Setenv("XDG_CONFIG_HOME", t.TempDir())
 	var stdout, stderr bytes.Buffer

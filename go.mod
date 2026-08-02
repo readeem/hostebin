@@ -3,6 +3,7 @@ module github.com/hostebin/hostebin
 go 1.26
 
 require (
+	github.com/peterbourgon/ff/v3 v3.4.0
 	github.com/yuin/goldmark v1.7.13
 	golang.org/x/crypto v0.48.0
 	tailscale.com v1.94.2

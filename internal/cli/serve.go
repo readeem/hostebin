@@ -25,22 +25,15 @@ import (
 )
 
 func runServe(args []string, stderr io.Writer) int {
+	cfg, err := NewConfig()
+	if err != nil {
+		fmt.Fprintln(stderr, "hostebin:", err)
+		return exitUsage
+	}
 	fs := flag.NewFlagSet("serve", flag.ContinueOnError)
 	fs.SetOutput(stderr)
-	var addr, dataDir, baseURL, tlsAddr, tlsCert, tlsKey, acmeDomain, acmeEmail, tsHostname string
-	var tailscale, funnel bool
-	fs.StringVar(&addr, "addr", envDefault("HOSTEBIN_ADDR", ":8080"), "plain HTTP listen address")
-	fs.StringVar(&dataDir, "data", envDefault("HOSTEBIN_DATA", "./data"), "data directory")
-	fs.StringVar(&baseURL, "base-url", os.Getenv("HOSTEBIN_BASE_URL"), "public base URL override")
-	fs.StringVar(&tlsAddr, "tls-addr", envDefault("HOSTEBIN_TLS_ADDR", ":8443"), "certificate TLS listen address")
-	fs.StringVar(&tlsCert, "tls-cert", os.Getenv("HOSTEBIN_TLS_CERT"), "TLS certificate file")
-	fs.StringVar(&tlsKey, "tls-key", os.Getenv("HOSTEBIN_TLS_KEY"), "TLS private key file")
-	fs.StringVar(&acmeDomain, "acme-domain", os.Getenv("HOSTEBIN_ACME_DOMAIN"), "Let's Encrypt domain")
-	fs.StringVar(&acmeEmail, "acme-email", os.Getenv("HOSTEBIN_ACME_EMAIL"), "Let's Encrypt account email")
-	fs.BoolVar(&tailscale, "tailscale", envBool("HOSTEBIN_TS"), "enable embedded Tailscale")
-	fs.BoolVar(&funnel, "funnel", envBool("HOSTEBIN_FUNNEL"), "enable Tailscale Funnel")
-	fs.StringVar(&tsHostname, "ts-hostname", envDefault("HOSTEBIN_TS_HOSTNAME", "hostebin"), "Tailscale node hostname")
-	if err := fs.Parse(args); err != nil {
+	cfg.registerServeFlags(fs)
+	if err := parseConfig(fs, args); err != nil {
 		return exitUsage
 	}
 	if fs.NArg() != 0 {
@@ -48,12 +41,17 @@ func runServe(args []string, stderr io.Writer) int {
 		return exitUsage
 	}
 	logger := slog.New(slog.NewTextHandler(stderr, nil))
-	st, err := store.New(dataDir)
+	httpAddr, err := httpListenAddr(cfg.HTTPHost, cfg.HTTPPort)
+	if err != nil {
+		logger.Error("invalid HTTP listener", "error", err)
+		return exitUsage
+	}
+	st, err := store.New(cfg.Data)
 	if err != nil {
 		logger.Error("initialize storage", "error", err)
 		return exitNetwork
 	}
-	token, generated, err := loadOrCreateToken(st.DataDir())
+	token, generated, err := loadOrCreateToken(st.DataDir(), cfg.Token)
 	if err != nil {
 		logger.Error("initialize token", "error", err)
 		return exitNetwork
@@ -61,36 +59,35 @@ func runServe(args []string, stderr io.Writer) int {
 	if generated {
 		logger.Info("generated upload token", "token", token, "path", filepath.Join(st.DataDir(), "token"))
 	}
-	maxUpload, err := parseBytes(envDefault("HOSTEBIN_MAX_UPLOAD", "32MiB"))
+	maxUpload, err := parseBytes(cfg.MaxUpload)
 	if err != nil {
-		logger.Error("invalid HOSTEBIN_MAX_UPLOAD", "error", err)
+		logger.Error("invalid max-upload", "error", err)
 		return exitUsage
 	}
-	maxFiles, err := strconv.Atoi(envDefault("HOSTEBIN_MAX_FILES", "64"))
-	if err != nil || maxFiles <= 0 {
-		logger.Error("HOSTEBIN_MAX_FILES must be positive")
+	if cfg.MaxFiles <= 0 {
+		logger.Error("max-files must be positive")
 		return exitUsage
 	}
 	var defaultTTL time.Duration
-	if raw := os.Getenv("HOSTEBIN_DEFAULT_TTL"); raw != "" && !strings.EqualFold(raw, "never") {
+	if raw := cfg.DefaultTTL; raw != "" && !strings.EqualFold(raw, "never") {
 		defaultTTL, err = server.ParseDuration(raw)
 		if err != nil || defaultTTL <= 0 {
-			logger.Error("invalid HOSTEBIN_DEFAULT_TTL")
+			logger.Error("invalid default-ttl")
 			return exitUsage
 		}
 	}
-	csp := os.Getenv("HOSTEBIN_CSP")
+	csp := cfg.CSP
 	if csp == "" {
 		csp = server.DefaultCSP
 	}
-	app, err := server.New(server.Config{Store: st, Token: token, MaxUpload: maxUpload, MaxFiles: maxFiles, DefaultTTL: defaultTTL, CSP: csp, Logger: logger})
+	app, err := server.New(server.Config{Store: st, Token: token, MaxUpload: maxUpload, MaxFiles: cfg.MaxFiles, DefaultTTL: defaultTTL, CSP: csp, Logger: logger})
 	if err != nil {
 		logger.Error("initialize server", "error", err)
 		return exitNetwork
 	}
 	ctx, cancel := signal.NotifyContext(context.Background(), os.Interrupt, syscall.SIGTERM)
 	defer cancel()
-	listeners, err := listen.Build(ctx, listen.Config{Addr: addr, BaseURL: baseURL, TLSAddr: tlsAddr, TLSCert: tlsCert, TLSKey: tlsKey, ACMEDomain: acmeDomain, ACMEEmail: acmeEmail, DataDir: st.DataDir(), Tailscale: tailscale || funnel, Funnel: funnel, TSHostname: tsHostname, TSAuthKey: os.Getenv("TS_AUTHKEY"), Logf: func(format string, values ...any) { logger.Info(fmt.Sprintf(format, values...)) }})
+	listeners, err := listen.Build(ctx, listen.Config{Addr: httpAddr, BaseURL: cfg.BaseURL, TLSAddr: cfg.TLSAddr, TLSCert: cfg.TLSCert, TLSKey: cfg.TLSKey, ACMEDomain: cfg.ACMEDomain, ACMEEmail: cfg.ACMEEmail, DataDir: st.DataDir(), Tailscale: cfg.Tailscale || cfg.Funnel, Funnel: cfg.Funnel, TSHostname: cfg.TSHostname, TSAuthKey: cfg.TSAuthKey, Logf: func(format string, values ...any) { logger.Info(fmt.Sprintf(format, values...)) }})
 	if err != nil {
 		logger.Error("initialize listeners", "error", err)
 		return exitNetwork
@@ -137,9 +134,19 @@ func runServe(args []string, stderr io.Writer) int {
 	}
 }
 
-func loadOrCreateToken(dataDir string) (string, bool, error) {
-	if token := os.Getenv("HOSTEBIN_TOKEN"); token != "" {
-		return token, false, nil
+func httpListenAddr(host string, port int) (string, error) {
+	if port < 0 || port > 65535 {
+		return "", fmt.Errorf("port must be between 0 and 65535")
+	}
+	if port == 0 {
+		return "", nil
+	}
+	return net.JoinHostPort(host, strconv.Itoa(port)), nil
+}
+
+func loadOrCreateToken(dataDir, configuredToken string) (string, bool, error) {
+	if configuredToken != "" {
+		return configuredToken, false, nil
 	}
 	path := filepath.Join(dataDir, "token")
 	if data, err := os.ReadFile(path); err == nil {
@@ -190,15 +197,4 @@ func parseBytes(raw string) (int64, error) {
 		return 0, fmt.Errorf("invalid byte size %q", raw)
 	}
 	return n, nil
-}
-
-func envDefault(key, fallback string) string {
-	if value := os.Getenv(key); value != "" {
-		return value
-	}
-	return fallback
-}
-func envBool(key string) bool {
-	value := strings.ToLower(os.Getenv(key))
-	return value == "1" || value == "true" || value == "yes" || value == "on"
 }

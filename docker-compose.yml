@@ -14,9 +14,9 @@ services:
     profiles: [tailscale]
     build: .
     restart: unless-stopped
-    command: ["serve", "--addr=", "--tailscale", "--data", "/data"]
+    command: ["serve", "--port=0", "--tailscale", "--data", "/data"]
     environment:
-      TS_AUTHKEY: ${TS_AUTHKEY:-}
+      HOSTEBIN_TS_AUTH_KEY: ${HOSTEBIN_TS_AUTH_KEY:-}
       HOSTEBIN_TOKEN: ${HOSTEBIN_TOKEN:-}
       HOSTEBIN_TS_HOSTNAME: ${HOSTEBIN_TS_HOSTNAME:-hostebin}
     volumes:

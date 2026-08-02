@@ -20,26 +20,28 @@ type listedBundle struct {
 }
 
 func runLS(args []string, stdout, stderr io.Writer) int {
+	cfg, err := NewConfig()
+	if err != nil {
+		fmt.Fprintln(stderr, "hostebin:", err)
+		return exitUsage
+	}
 	fs := flag.NewFlagSet("ls", flag.ContinueOnError)
 	fs.SetOutput(stderr)
-	var serverURL, token string
 	var jsonOutput bool
-	fs.StringVar(&serverURL, "server", "", "hostebin server URL")
-	fs.StringVar(&token, "token", "", "upload bearer token")
-	fs.BoolVar(&jsonOutput, "json", false, "print JSON")
-	if err := fs.Parse(args); err != nil {
+	cfg.registerClientFlags(fs)
+	boolVar(fs, &jsonOutput, "json", "print JSON")
+	if err := parseConfig(fs, args); err != nil {
 		return exitUsage
 	}
 	if fs.NArg() != 0 {
 		fmt.Fprintln(stderr, "usage: hostebin ls [flags]")
 		return exitUsage
 	}
-	cfg, err := resolveClientConfig(serverURL, token)
-	if err != nil {
+	if err := resolveClientConfig(cfg); err != nil {
 		fmt.Fprintln(stderr, "hostebin:", err)
 		return exitUsage
 	}
-	body, status, err := request(http.MethodGet, cfg.URL+"/api/v1/bundles", cfg.Token)
+	body, status, err := request(http.MethodGet, cfg.Server+"/api/v1/bundles", cfg.Token)
 	if err != nil {
 		fmt.Fprintln(stderr, "hostebin:", err)
 		return exitNetwork
@@ -75,24 +77,26 @@ func runLS(args []string, stdout, stderr io.Writer) int {
 }
 
 func runRM(args []string, stdout, stderr io.Writer) int {
+	cfg, err := NewConfig()
+	if err != nil {
+		fmt.Fprintln(stderr, "hostebin:", err)
+		return exitUsage
+	}
 	fs := flag.NewFlagSet("rm", flag.ContinueOnError)
 	fs.SetOutput(stderr)
-	var serverURL, token string
-	fs.StringVar(&serverURL, "server", "", "hostebin server URL")
-	fs.StringVar(&token, "token", "", "upload bearer token")
-	if err := fs.Parse(args); err != nil {
+	cfg.registerClientFlags(fs)
+	if err := parseConfig(fs, args); err != nil {
 		return exitUsage
 	}
 	if fs.NArg() != 1 {
 		fmt.Fprintln(stderr, "usage: hostebin rm [flags] <id>")
 		return exitUsage
 	}
-	cfg, err := resolveClientConfig(serverURL, token)
-	if err != nil {
+	if err := resolveClientConfig(cfg); err != nil {
 		fmt.Fprintln(stderr, "hostebin:", err)
 		return exitUsage
 	}
-	body, status, err := request(http.MethodDelete, cfg.URL+"/api/v1/bundles/"+url.PathEscape(fs.Arg(0)), cfg.Token)
+	body, status, err := request(http.MethodDelete, cfg.Server+"/api/v1/bundles/"+url.PathEscape(fs.Arg(0)), cfg.Token)
 	if err != nil {
 		fmt.Fprintln(stderr, "hostebin:", err)
 		return exitNetwork

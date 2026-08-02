@@ -37,30 +37,33 @@ type localFile struct {
 }
 
 func runUp(args []string, stdin io.Reader, stdout, stderr io.Writer) int {
+	cfg, err := NewConfig()
+	if err != nil {
+		fmt.Fprintln(stderr, "hostebin:", err)
+		return exitUsage
+	}
 	fs := flag.NewFlagSet("up", flag.ContinueOnError)
 	fs.SetOutput(stderr)
-	var title, ttl, entry, id, serverURL, token, stdinName string
+	var title, ttl, entry, id, stdinName string
 	var jsonOutput, openBrowser, quiet bool
+	cfg.registerClientFlags(fs)
 	fs.StringVar(&title, "title", "", "bundle title")
 	fs.StringVar(&ttl, "ttl", "", "expiry duration (for example 7d or 30m) or never")
 	fs.StringVar(&entry, "entry", "", "entry file")
-	fs.BoolVar(&jsonOutput, "json", false, "print structured JSON")
+	boolVar(fs, &jsonOutput, "json", "print structured JSON")
 	fs.StringVar(&id, "id", "", "replace an existing bundle")
-	fs.BoolVar(&openBrowser, "open", false, "open the resulting URL")
-	fs.StringVar(&serverURL, "server", "", "hostebin server URL")
-	fs.StringVar(&token, "token", "", "upload bearer token")
-	fs.BoolVar(&quiet, "quiet", false, "suppress diagnostics")
+	boolVar(fs, &openBrowser, "open", "open the resulting URL")
+	boolVar(fs, &quiet, "quiet", "suppress diagnostics")
 	fs.StringVar(&stdinName, "name", "", "file name for stdin")
 	fs.StringVar(&stdinName, "n", "", "file name for stdin (shorthand)")
-	if err := fs.Parse(args); err != nil {
+	if err := parseConfig(fs, args); err != nil {
 		return exitUsage
 	}
 	if fs.NArg() == 0 {
 		fmt.Fprintln(stderr, "usage: hostebin up [flags] <file|directory|->...")
 		return exitUsage
 	}
-	cfg, err := resolveClientConfig(serverURL, token)
-	if err != nil {
+	if err := resolveClientConfig(cfg); err != nil {
 		fmt.Fprintln(stderr, "hostebin:", err)
 		return exitUsage
 	}
@@ -126,7 +129,7 @@ func runUp(args []string, stdin io.Reader, stdout, stderr io.Writer) int {
 		}
 		writeErr <- pipeWriter.Close()
 	}()
-	endpoint := cfg.URL + "/api/v1/bundles"
+	endpoint := cfg.Server + "/api/v1/bundles"
 	method := http.MethodPost
 	if id != "" {
 		method = http.MethodPut

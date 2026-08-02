@@ -10,7 +10,9 @@ RUN CGO_ENABLED=0 go build -trimpath -ldflags "-s -w -X main.version=${VERSION}"
 FROM gcr.io/distroless/static-debian12:nonroot
 COPY --from=build /out/hostebin /hostebin
 COPY --from=build --chown=65532:65532 /out/data /data
+ENV XDG_CONFIG_HOME=/data/config \
+    XDG_DATA_HOME=/data
 VOLUME ["/data"]
 EXPOSE 8080
 ENTRYPOINT ["/hostebin"]
-CMD ["serve", "--addr", ":8080", "--data", "/data"]
+CMD ["serve", "--data", "/data"]
