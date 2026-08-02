@@ -27,9 +27,12 @@ func runLS(args []string, stdout, stderr io.Writer) int {
 	}
 	fs := flag.NewFlagSet("ls", flag.ContinueOnError)
 	fs.SetOutput(stderr)
+
 	var jsonOutput bool
+
 	cfg.registerClientFlags(fs)
 	boolVar(fs, &jsonOutput, "json", "print JSON")
+
 	if err := parseConfig(fs, args); err != nil {
 		return exitUsage
 	}
@@ -85,6 +88,7 @@ func runRM(args []string, stdout, stderr io.Writer) int {
 	fs := flag.NewFlagSet("rm", flag.ContinueOnError)
 	fs.SetOutput(stderr)
 	cfg.registerClientFlags(fs)
+
 	if err := parseConfig(fs, args); err != nil {
 		return exitUsage
 	}

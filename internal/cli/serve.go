@@ -33,6 +33,7 @@ func runServe(args []string, stderr io.Writer) int {
 	fs := flag.NewFlagSet("serve", flag.ContinueOnError)
 	fs.SetOutput(stderr)
 	cfg.registerServeFlags(fs)
+	
 	if err := parseConfig(fs, args); err != nil {
 		return exitUsage
 	}
@@ -80,14 +81,41 @@ func runServe(args []string, stderr io.Writer) int {
 	if csp == "" {
 		csp = server.DefaultCSP
 	}
-	app, err := server.New(server.Config{Store: st, Token: token, MaxUpload: maxUpload, MaxFiles: cfg.MaxFiles, DefaultTTL: defaultTTL, CSP: csp, Logger: logger})
+	app, err := server.New(
+		server.Config{
+			Store:      st,
+			Token:      token,
+			MaxUpload:  maxUpload,
+			MaxFiles:   cfg.MaxFiles,
+			DefaultTTL: defaultTTL,
+			CSP:        csp,
+			Logger:     logger,
+		},
+	)
 	if err != nil {
 		logger.Error().Err(err).Msg("initialize server")
 		return exitNetwork
 	}
 	ctx, cancel := signal.NotifyContext(context.Background(), os.Interrupt, syscall.SIGTERM)
 	defer cancel()
-	listeners, err := listen.Build(ctx, listen.Config{Addr: httpAddr, BaseURL: cfg.BaseURL, TLSAddr: cfg.TLSAddr, TLSCert: cfg.TLSCert, TLSKey: cfg.TLSKey, ACMEDomain: cfg.ACMEDomain, ACMEEmail: cfg.ACMEEmail, DataDir: st.DataDir(), Tailscale: cfg.Tailscale || cfg.Funnel, Funnel: cfg.Funnel, TSHostname: cfg.TSHostname, TSAuthKey: cfg.TSAuthKey, Logf: func(format string, values ...any) { logger.Info().Msgf(format, values...) }})
+	listeners, err := listen.Build(
+		ctx,
+		listen.Config{
+			Addr:       httpAddr,
+			BaseURL:    cfg.BaseURL,
+			TLSAddr:    cfg.TLSAddr,
+			TLSCert:    cfg.TLSCert,
+			TLSKey:     cfg.TLSKey,
+			ACMEDomain: cfg.ACMEDomain,
+			ACMEEmail:  cfg.ACMEEmail,
+			DataDir:    st.DataDir(),
+			Tailscale:  cfg.Tailscale || cfg.Funnel,
+			Funnel:     cfg.Funnel,
+			TSHostname: cfg.TSHostname,
+			TSAuthKey:  cfg.TSAuthKey,
+			Logf:       func(format string, values ...any) { logger.Info().Msgf(format, values...) },
+		},
+	)
 	if err != nil {
 		logger.Error().Err(err).Msg("initialize listeners")
 		return exitNetwork
@@ -95,6 +123,7 @@ func runServe(args []string, stderr io.Writer) int {
 	defer listeners.Close()
 	gcStop := make(chan struct{})
 	defer close(gcStop)
+
 	go st.RunGC(gcStop, 10*time.Minute, func(n int, err error) {
 		if err != nil {
 			logger.Error().Err(err).Msg("garbage collection")
@@ -104,6 +133,7 @@ func runServe(args []string, stderr io.Writer) int {
 	})
 	errCh := make(chan error, len(listeners.Endpoints))
 	servers := make([]*http.Server, 0, len(listeners.Endpoints))
+
 	for _, endpoint := range listeners.Endpoints {
 		handler := endpoint.Handler
 		if handler == nil {
@@ -115,6 +145,7 @@ func runServe(args []string, stderr io.Writer) int {
 		httpServer := &http.Server{Handler: handler, ReadHeaderTimeout: 10 * time.Second}
 		servers = append(servers, httpServer)
 		logger.Info().Str("address", endpoint.Listener.Addr().String()).Msg("listening")
+
 		go func(ln net.Listener) { errCh <- httpServer.Serve(ln) }(endpoint.Listener)
 	}
 	select {

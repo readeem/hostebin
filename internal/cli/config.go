@@ -241,7 +241,9 @@ func (v flexibleBoolValue) String() string {
 	}
 	return strconv.FormatBool(*v.target)
 }
+
 func (v flexibleBoolValue) IsBoolFlag() bool { return true }
+
 func (v flexibleBoolValue) Set(raw string) error {
 	value, err := parseBool(raw)
 	if err != nil {
