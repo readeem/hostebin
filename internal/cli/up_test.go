@@ -10,8 +10,8 @@ import (
 
 	"net/http/httptest"
 
-	"github.com/hostebin/hostebin/internal/server"
-	"github.com/hostebin/hostebin/internal/store"
+	"github.com/readeem/hostebin/internal/server"
+	"github.com/readeem/hostebin/internal/store"
 )
 
 func cliTestServer(t *testing.T) *httptest.Server {

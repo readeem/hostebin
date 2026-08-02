@@ -12,7 +12,7 @@ import (
 	"strings"
 	"time"
 
-	"github.com/hostebin/hostebin/internal/store"
+	"github.com/readeem/hostebin/internal/store"
 )
 
 type uploadResponse struct {

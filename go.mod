@@ -1,4 +1,4 @@
-module github.com/hostebin/hostebin
+module github.com/readeem/hostebin
 
 go 1.26
 

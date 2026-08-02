@@ -9,7 +9,7 @@ import (
 	"path"
 	"strings"
 
-	"github.com/hostebin/hostebin/internal/store"
+	"github.com/readeem/hostebin/internal/store"
 )
 
 func (s *Server) serveBundle(w http.ResponseWriter, r *http.Request) {

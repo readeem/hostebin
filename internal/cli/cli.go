@@ -3,6 +3,8 @@ package cli
 import (
 	"fmt"
 	"io"
+
+	"github.com/readeem/hostebin/internal/version"
 )
 
 const (
@@ -10,8 +12,6 @@ const (
 	exitUsage   = 1
 	exitNetwork = 2
 )
-
-var Version = "dev"
 
 func Run(args []string, stdin io.Reader, stdout, stderr io.Writer) int {
 	if len(args) == 0 {
@@ -28,7 +28,7 @@ func Run(args []string, stdin io.Reader, stdout, stderr io.Writer) int {
 	case "rm":
 		return runRM(args[1:], stdout, stderr)
 	case "version", "--version", "-version":
-		fmt.Fprintln(stdout, Version)
+		fmt.Fprintln(stdout, version.String())
 		return exitOK
 	case "help", "--help", "-h":
 		usage(stdout)
@@ -40,4 +40,33 @@ func Run(args []string, stdin io.Reader, stdout, stderr io.Writer) int {
 	}
 }
 
-func usage(w io.Writer) { fmt.Fprintln(w, "usage: hostebin <serve|up|ls|rm|version> [flags]") }
+func usage(w io.Writer) {
+	fmt.Fprint(w, `usage: hostebin <command> [flags]
+
+Commands:
+  up [flags] <file|dir|->...  upload a bundle and print its URL
+  ls [flags]                  list live bundles
+  rm [flags] <id>             delete a bundle
+  serve [flags]               run the server
+  version                     print version information
+  help                        print this message
+
+Client flags (up, ls, rm):
+  --server URL     server base URL      (HOSTEBIN_SERVER)
+  --token TOKEN    bearer token         (HOSTEBIN_TOKEN)
+  --config PATH    config file          (HOSTEBIN_CONFIG)
+
+up flags:
+  --title TEXT     bundle title
+  --ttl DURATION   expiry such as 30m, 7d, or never
+  --entry PATH     file served at the bundle root
+  --id ID          replace an existing bundle in place
+  -n, --name PATH  name to give data read from stdin
+  --json           print the full JSON response instead of the URL
+  --open           open the URL in the system browser
+  --quiet          suppress optional diagnostics
+
+Run "hostebin serve --help" for the full server flag list.
+Documentation: https://github.com/readeem/hostebin
+`)
+}

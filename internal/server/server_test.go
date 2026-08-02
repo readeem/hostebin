@@ -12,7 +12,7 @@ import (
 	"testing"
 	"time"
 
-	"github.com/hostebin/hostebin/internal/store"
+	"github.com/readeem/hostebin/internal/store"
 )
 
 func testServer(t *testing.T, maxUpload int64, maxFiles int) (*store.Store, *httptest.Server) {

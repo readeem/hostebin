@@ -12,7 +12,7 @@ import (
 	"strings"
 	"time"
 
-	"github.com/hostebin/hostebin/internal/store"
+	"github.com/readeem/hostebin/internal/store"
 )
 
 const DefaultCSP = "default-src 'self' data: blob: https: 'unsafe-inline' 'unsafe-eval'; connect-src 'self'; form-action 'none'; frame-ancestors 'none'"

@@ -19,9 +19,9 @@ import (
 	"syscall"
 	"time"
 
-	"github.com/hostebin/hostebin/internal/listen"
-	"github.com/hostebin/hostebin/internal/server"
-	"github.com/hostebin/hostebin/internal/store"
+	"github.com/readeem/hostebin/internal/listen"
+	"github.com/readeem/hostebin/internal/server"
+	"github.com/readeem/hostebin/internal/store"
 )
 
 func runServe(args []string, stderr io.Writer) int {
