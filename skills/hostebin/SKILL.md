@@ -11,27 +11,6 @@ person you are working with; they open it in a browser and see the rendered page
 Use it when the work product is visual or too large for chat: a report, a chart, a
 diff view, a generated site, a screenshot, a long Markdown document.
 
-## Before the first upload
-
-Check that the CLI is installed and configured:
-
-```sh
-hostebin version
-hostebin ls >/dev/null    # exits 0 when server + token are set
-```
-
-If `hostebin ls` complains that a server or token is required, the environment is
-not set up. Ask the user for their server URL and token, or set them yourself:
-
-```sh
-export HOSTEBIN_SERVER=https://hostebin.example.com
-export HOSTEBIN_TOKEN=...
-```
-
-If no server exists at all, one can be started locally with `hostebin serve` — it
-prints a generated token on first run and stores it in the data directory. Do not
-start a long-running server without asking the user first.
-
 ## Uploading
 
 ```sh
@@ -67,8 +46,6 @@ hostebin up --json report.html
 
 ## Rules that matter
 
-- **Report the URL verbatim.** Never invent, shorten, or guess a bundle URL — the
-  128-bit ID in it is the only thing that makes the bundle reachable.
 - **Markdown is rendered** as a styled HTML page; add `?raw=1` to the URL for source.
 - **The entry page** is picked automatically: a single file, else `index.html`, else
   the first HTML file, else the first Markdown file, else a generated file listing.
