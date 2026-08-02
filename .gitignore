@@ -1,0 +1,15 @@
+# Local build output
+/hostebin
+/hostebin.exe
+/dist/
+
+# Local state and secrets
+*.pem
+.env
+token
+
+# Editor and OS noise
+.DS_Store
+*.swp
+.idea/
+.vscode/

@@ -1,0 +1,63 @@
+name: Bug report
+description: Something does not work as documented
+labels: [bug]
+body:
+  - type: markdown
+    attributes:
+      value: |
+        For security issues, use [private reporting](https://github.com/readeem/hostebin/security/advisories/new) instead.
+
+  - type: textarea
+    id: what
+    attributes:
+      label: What happened
+      description: Include the exact command and the stderr output it produced.
+      render: shell
+    validations:
+      required: true
+
+  - type: textarea
+    id: expected
+    attributes:
+      label: What you expected
+    validations:
+      required: true
+
+  - type: input
+    id: version
+    attributes:
+      label: Version
+      description: Output of `hostebin version`
+      placeholder: hostebin 0.1.0 (abc1234, 2026-01-01T00:00:00Z) go1.26.0 linux/amd64
+    validations:
+      required: true
+
+  - type: dropdown
+    id: install
+    attributes:
+      label: How it was installed
+      options:
+        - go install
+        - release binary or archive
+        - deb / rpm / apk / Arch package
+        - Homebrew
+        - Scoop
+        - AUR
+        - Docker
+        - built from source
+    validations:
+      required: true
+
+  - type: input
+    id: os
+    attributes:
+      label: OS and architecture
+      placeholder: Ubuntu 24.04, amd64
+    validations:
+      required: true
+
+  - type: textarea
+    id: server
+    attributes:
+      label: Server setup
+      description: Relevant `serve` flags or config (redact tokens), or "hosted elsewhere".
