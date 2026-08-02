@@ -48,6 +48,12 @@ func (s *Server) createBundle(w http.ResponseWriter, r *http.Request) {
 		writeError(w, http.StatusBadRequest, err.Error())
 		return
 	}
+	s.cfg.Logger.Info().
+		Str("action", "create").
+		Str("bundle_id", meta.ID).
+		Int("file_count", len(meta.Files)).
+		Int64("byte_count", meta.Bytes).
+		Msg("bundle created")
 	writeJSON(w, http.StatusCreated, makeUploadResponse(baseURL(r), meta))
 }
 
@@ -77,6 +83,13 @@ func (s *Server) updateBundle(w http.ResponseWriter, r *http.Request) {
 		writeError(w, status, err.Error())
 		return
 	}
+	s.cfg.Logger.Info().
+		Str("action", "update").
+		Str("bundle_id", meta.ID).
+		Str("mode", mode).
+		Int("file_count", len(meta.Files)).
+		Int64("byte_count", meta.Bytes).
+		Msg("bundle updated")
 	writeJSON(w, http.StatusOK, makeUploadResponse(baseURL(r), meta))
 }
 
@@ -230,15 +243,24 @@ func (s *Server) listBundles(w http.ResponseWriter, r *http.Request) {
 		writeError(w, http.StatusInternalServerError, err.Error())
 		return
 	}
+	s.cfg.Logger.Info().
+		Str("action", "read").
+		Int("bundle_count", len(metas)).
+		Msg("bundles listed")
 	writeJSON(w, http.StatusOK, metas)
 }
 
 func (s *Server) deleteBundle(w http.ResponseWriter, r *http.Request) {
-	err := s.cfg.Store.Delete(r.PathValue("id"))
+	id := r.PathValue("id")
+	err := s.cfg.Store.Delete(id)
 	if err != nil {
 		writeError(w, statusForStoreError(err), err.Error())
 		return
 	}
+	s.cfg.Logger.Info().
+		Str("action", "delete").
+		Str("bundle_id", id).
+		Msg("bundle deleted")
 	w.WriteHeader(http.StatusNoContent)
 }
 

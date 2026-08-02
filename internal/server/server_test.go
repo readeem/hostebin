@@ -13,6 +13,7 @@ import (
 	"time"
 
 	"github.com/readeem/hostebin/internal/store"
+	"github.com/rs/zerolog"
 )
 
 func testServer(t *testing.T, maxUpload int64, maxFiles int) (*store.Store, *httptest.Server) {
@@ -192,5 +193,82 @@ func TestDurationDays(t *testing.T) {
 	d, err := ParseDuration("7d")
 	if err != nil || d != 7*24*time.Hour {
 		t.Fatalf("ParseDuration = %v, %v", d, err)
+	}
+}
+
+func TestCRUDActionLogging(t *testing.T) {
+	st, err := store.New(t.TempDir())
+	if err != nil {
+		t.Fatal(err)
+	}
+	var logOutput bytes.Buffer
+	logger := zerolog.New(&logOutput)
+	app, err := New(Config{Store: st, Token: "test-token", Logger: &logger})
+	if err != nil {
+		t.Fatal(err)
+	}
+	ts := httptest.NewServer(app.Handler())
+	defer ts.Close()
+
+	created, result := rawUpload(t, ts, "hello.txt", "hello", "test-token")
+	if created.StatusCode != http.StatusCreated {
+		t.Fatalf("create status = %d", created.StatusCode)
+	}
+
+	update, _ := http.NewRequest(http.MethodPut, ts.URL+"/api/v1/bundles/"+result.ID+"?mode=merge", strings.NewReader("updated"))
+	update.Header.Set("Authorization", "Bearer test-token")
+	update.Header.Set("X-Hostebin-Filename", "updated.txt")
+	updated, err := http.DefaultClient.Do(update)
+	if err != nil {
+		t.Fatal(err)
+	}
+	updated.Body.Close()
+	if updated.StatusCode != http.StatusOK {
+		t.Fatalf("update status = %d", updated.StatusCode)
+	}
+
+	list, _ := http.NewRequest(http.MethodGet, ts.URL+"/api/v1/bundles", nil)
+	list.Header.Set("Authorization", "Bearer test-token")
+	listed, err := http.DefaultClient.Do(list)
+	if err != nil {
+		t.Fatal(err)
+	}
+	listed.Body.Close()
+	if listed.StatusCode != http.StatusOK {
+		t.Fatalf("list status = %d", listed.StatusCode)
+	}
+
+	deleteRequest, _ := http.NewRequest(http.MethodDelete, ts.URL+"/api/v1/bundles/"+result.ID, nil)
+	deleteRequest.Header.Set("Authorization", "Bearer test-token")
+	deleted, err := http.DefaultClient.Do(deleteRequest)
+	if err != nil {
+		t.Fatal(err)
+	}
+	deleted.Body.Close()
+	if deleted.StatusCode != http.StatusNoContent {
+		t.Fatalf("delete status = %d", deleted.StatusCode)
+	}
+
+	events := make(map[string]map[string]any)
+	for line := range strings.SplitSeq(strings.TrimSpace(logOutput.String()), "\n") {
+		var event map[string]any
+		if err := json.Unmarshal([]byte(line), &event); err != nil {
+			t.Fatalf("decode log line %q: %v", line, err)
+		}
+		action, _ := event["action"].(string)
+		events[action] = event
+	}
+	for _, action := range []string{"create", "read", "update", "delete"} {
+		if events[action] == nil {
+			t.Errorf("missing %q action in logs: %s", action, logOutput.String())
+		}
+	}
+	for _, action := range []string{"create", "update", "delete"} {
+		if got := events[action]["bundle_id"]; got != result.ID {
+			t.Errorf("%s bundle_id = %v, want %q", action, got, result.ID)
+		}
+	}
+	if got := events["update"]["mode"]; got != "merge" {
+		t.Errorf("update mode = %v, want merge", got)
 	}
 }

@@ -114,7 +114,7 @@ func runServe(args []string, stderr io.Writer) int {
 		}
 		httpServer := &http.Server{Handler: handler, ReadHeaderTimeout: 10 * time.Second}
 		servers = append(servers, httpServer)
-		logger.Info().Str("address", endpoint.Listener.Addr().String()).Str("base_url", endpoint.BaseURL).Msg("listening")
+		logger.Info().Str("address", endpoint.Listener.Addr().String()).Msg("listening")
 		go func(ln net.Listener) { errCh <- httpServer.Serve(ln) }(endpoint.Listener)
 	}
 	select {
