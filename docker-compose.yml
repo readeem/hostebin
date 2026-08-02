@@ -1,6 +1,8 @@
 services:
   plain:
     profiles: [plain]
+    # Pull the published image, or `docker compose build` to use the local source.
+    image: ghcr.io/readeem/hostebin:latest
     build: .
     restart: unless-stopped
     ports:
@@ -12,6 +14,7 @@ services:
 
   tailscale:
     profiles: [tailscale]
+    image: ghcr.io/readeem/hostebin:latest
     build: .
     restart: unless-stopped
     command: ["serve", "--port=0", "--tailscale", "--data", "/data"]

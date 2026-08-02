@@ -1,0 +1,247 @@
+# GoReleaser builds every release artifact: archives, checksums, Linux packages,
+# and the Homebrew/Scoop/AUR manifests. Validate changes with `just release-check`
+# and rehearse a full release with `just release-snapshot`.
+# yaml-language-server: $schema=https://goreleaser.com/static/schema.json
+version: 2
+
+project_name: hostebin
+
+before:
+  hooks:
+    - go mod download
+    - go mod verify
+
+builds:
+  - id: hostebin
+    main: ./cmd/hostebin
+    binary: hostebin
+    env:
+      - CGO_ENABLED=0
+    flags:
+      - -trimpath
+    # The one place a release build stamps its identity. Keep in sync with the
+    # justfile and Dockerfile, which target the same package.
+    ldflags:
+      - -s -w
+      - -X github.com/readeem/hostebin/internal/version.Version={{ .Version }}
+      - -X github.com/readeem/hostebin/internal/version.Commit={{ .FullCommit }}
+      - -X github.com/readeem/hostebin/internal/version.Date={{ .CommitDate }}
+    mod_timestamp: "{{ .CommitTimestamp }}"
+    goos:
+      - linux
+      - darwin
+      - windows
+      - freebsd
+    goarch:
+      - amd64
+      - arm64
+      - "386"
+      - arm
+    goarm:
+      - "7"
+    ignore:
+      - goos: darwin
+        goarch: "386"
+      - goos: darwin
+        goarch: arm
+      - goos: windows
+        goarch: arm
+      - goos: windows
+        goarch: "386"
+      - goos: freebsd
+        goarch: arm
+      - goos: freebsd
+        goarch: "386"
+
+archives:
+  - id: hostebin
+    ids:
+      - hostebin
+    formats:
+      - tar.gz
+    format_overrides:
+      - goos: windows
+        formats:
+          - zip
+    # Deliberately version-free so that
+    # /releases/latest/download/hostebin_linux_amd64.tar.gz always resolves.
+    name_template: >-
+      {{ .ProjectName }}_{{ .Os }}_{{ .Arch }}{{ with .Arm }}v{{ . }}{{ end }}
+    files:
+      - README.md
+      - LICENSE
+      - skills/README.md
+      - skills/**/*
+
+checksum:
+  name_template: checksums.txt
+
+snapshot:
+  version_template: "{{ incpatch .Version }}-snapshot"
+
+changelog:
+  use: github
+  sort: asc
+  filters:
+    exclude:
+      - "^docs:"
+      - "^test:"
+      - "^chore:"
+      - "^ci:"
+      - Merge pull request
+      - Merge branch
+  groups:
+    - title: Features
+      regexp: '^.*?feat(\(.+\))??!?:.+$'
+      order: 0
+    - title: Fixes
+      regexp: '^.*?fix(\(.+\))??!?:.+$'
+      order: 1
+    - title: Other
+      order: 99
+
+release:
+  github:
+    owner: readeem
+    name: hostebin
+  draft: false
+  prerelease: auto
+  make_latest: "{{ if .Prerelease }}false{{ else }}true{{ end }}"
+  header: |
+    ## hostebin {{ .Tag }}
+
+    Install with `go install github.com/readeem/hostebin/cmd/hostebin@{{ .Tag }}`,
+    a package manager (see the README), or by downloading a binary below.
+  footer: |
+    ---
+    Verify a download against `checksums.txt`:
+
+    ```sh
+    sha256sum -c checksums.txt --ignore-missing
+    ```
+
+# Native Linux packages. deb/rpm/apk/pkg.tar.zst are attached to the GitHub
+# release; a hosted apt/yum repository can be layered on top later.
+nfpms:
+  - id: hostebin
+    ids:
+      - hostebin
+    package_name: hostebin
+    vendor: Readeem
+    homepage: https://github.com/readeem/hostebin
+    maintainer: Readeem <99687127+Readeem@users.noreply.github.com>
+    description: |-
+      Upload a bundle of files and get a shareable web URL.
+      hostebin is a single static binary that is both the server and the client,
+      designed for agents that need to hand a rendered page to a person.
+    license: MIT
+    section: web
+    formats:
+      - deb
+      - rpm
+      - apk
+      - archlinux
+    bindir: /usr/bin
+    file_name_template: >-
+      {{ .ProjectName }}_{{ .Os }}_{{ .Arch }}{{ with .Arm }}v{{ . }}{{ end }}
+    contents:
+      - src: packaging/hostebin.service
+        dst: /usr/lib/systemd/system/hostebin.service
+        file_info:
+          mode: 0644
+        packager: deb
+      - src: packaging/hostebin.service
+        dst: /usr/lib/systemd/system/hostebin.service
+        file_info:
+          mode: 0644
+        packager: rpm
+      - src: packaging/hostebin.service
+        dst: /usr/lib/systemd/system/hostebin.service
+        file_info:
+          mode: 0644
+        packager: archlinux
+      - src: LICENSE
+        dst: /usr/share/doc/hostebin/LICENSE
+        file_info:
+          mode: 0644
+      - src: README.md
+        dst: /usr/share/doc/hostebin/README.md
+        file_info:
+          mode: 0644
+    archlinux:
+      pkgbase: hostebin
+
+# Homebrew: `brew install readeem/tap/hostebin`.
+# Requires the readeem/homebrew-tap repository and a HOMEBREW_TAP_GITHUB_TOKEN
+# secret with write access to it. Without the secret the step is skipped.
+homebrew_casks:
+  - name: hostebin
+    ids:
+      - hostebin
+    binaries:
+      - hostebin
+    homepage: https://github.com/readeem/hostebin
+    description: Upload a bundle of files and get a shareable web URL
+    license: MIT
+    repository:
+      owner: readeem
+      name: homebrew-tap
+      branch: main
+      token: '{{ envOrDefault "HOMEBREW_TAP_GITHUB_TOKEN" "" }}'
+    skip_upload: '{{ if envOrDefault "HOMEBREW_TAP_GITHUB_TOKEN" "" }}false{{ else }}true{{ end }}'
+    commit_author:
+      name: goreleaser
+      email: 99687127+Readeem@users.noreply.github.com
+    hooks:
+      post:
+        # Release binaries are not notarized, so drop the quarantine flag that
+        # would otherwise make macOS refuse to run the downloaded binary.
+        install: |
+          if system_command("/usr/bin/xattr", args: ["-h"]).exit_status == 0
+            system_command "/usr/bin/xattr", args: ["-dr", "com.apple.quarantine", "#{staged_path}/hostebin"]
+          end
+
+# Scoop: `scoop bucket add readeem https://github.com/readeem/scoop-bucket`.
+# Requires that repository plus a SCOOP_BUCKET_GITHUB_TOKEN secret.
+scoops:
+  - name: hostebin
+    ids:
+      - hostebin
+    homepage: https://github.com/readeem/hostebin
+    description: Upload a bundle of files and get a shareable web URL
+    license: MIT
+    repository:
+      owner: readeem
+      name: scoop-bucket
+      branch: main
+      token: '{{ envOrDefault "SCOOP_BUCKET_GITHUB_TOKEN" "" }}'
+    skip_upload: '{{ if envOrDefault "SCOOP_BUCKET_GITHUB_TOKEN" "" }}false{{ else }}true{{ end }}'
+    commit_author:
+      name: goreleaser
+      email: 99687127+Readeem@users.noreply.github.com
+
+# AUR: `yay -S hostebin-bin`. Requires an AUR account with the hostebin-bin
+# package registered and an AUR_KEY secret holding its SSH private key.
+aurs:
+  - name: hostebin-bin
+    ids:
+      - hostebin
+    homepage: https://github.com/readeem/hostebin
+    description: Upload a bundle of files and get a shareable web URL
+    license: MIT
+    maintainers:
+      - Readeem <99687127+Readeem@users.noreply.github.com>
+    provides:
+      - hostebin
+    conflicts:
+      - hostebin
+    private_key: '{{ envOrDefault "AUR_KEY" "" }}'
+    git_url: ssh://aur@aur.archlinux.org/hostebin-bin.git
+    skip_upload: '{{ if envOrDefault "AUR_KEY" "" }}false{{ else }}true{{ end }}'
+    commit_author:
+      name: goreleaser
+      email: 99687127+Readeem@users.noreply.github.com
+    package: |-
+      install -Dm755 "./hostebin" "${pkgdir}/usr/bin/hostebin"
+      install -Dm644 "./LICENSE" "${pkgdir}/usr/share/licenses/hostebin/LICENSE"
+      install -Dm644 "./README.md" "${pkgdir}/usr/share/doc/hostebin/README.md"

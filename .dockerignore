@@ -1,5 +1,12 @@
 .git
+.github
 .gitignore
+.goreleaser.yaml
+dist
+docs
 data
 hostebin
+justfile
+packaging
+skills
 *.log
