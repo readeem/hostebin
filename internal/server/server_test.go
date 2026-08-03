@@ -85,6 +85,29 @@ func TestRawUploadFetchAndHeaders(t *testing.T) {
 	}
 }
 
+func TestFolderPathReturnsNotFound(t *testing.T) {
+	_, ts := testServer(t, 1024, 4)
+	resp, result := rawUpload(t, ts, "docs/page.html", "nested", "test-token")
+	if resp.StatusCode != http.StatusCreated {
+		body, _ := io.ReadAll(resp.Body)
+		resp.Body.Close()
+		t.Fatalf("upload = %d: %s", resp.StatusCode, body)
+	}
+
+	folder, err := http.Get(result.URL + "docs")
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer folder.Body.Close()
+	body, err := io.ReadAll(folder.Body)
+	if err != nil {
+		t.Fatalf("read folder response: %v", err)
+	}
+	if folder.StatusCode != http.StatusNotFound {
+		t.Fatalf("folder status = %d: %s", folder.StatusCode, body)
+	}
+}
+
 func TestAuthLimitsAndUnknownType(t *testing.T) {
 	_, ts := testServer(t, 4, 1)
 	resp, _ := rawUpload(t, ts, "x.txt", "x", "wrong")

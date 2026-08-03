@@ -52,6 +52,15 @@ func (s *Server) serveFile(w http.ResponseWriter, r *http.Request, meta *store.B
 		return
 	}
 	defer f.Close()
+	info, statErr := f.Stat()
+	if statErr != nil {
+		http.Error(w, "internal server error", http.StatusInternalServerError)
+		return
+	}
+	if !info.Mode().IsRegular() {
+		http.NotFound(w, r)
+		return
+	}
 	raw := r.URL.Query().Get("raw") == "1"
 	ext := strings.ToLower(path.Ext(name))
 	if !raw && (ext == ".md" || ext == ".markdown") {
@@ -70,11 +79,6 @@ func (s *Server) serveFile(w http.ResponseWriter, r *http.Request, meta *store.B
 		w.Header().Set("Content-Disposition", fmt.Sprintf("attachment; filename=%q", path.Base(name)))
 	}
 	w.Header().Set("Content-Type", contentType)
-	info, statErr := f.Stat()
-	if statErr != nil {
-		http.Error(w, "internal server error", http.StatusInternalServerError)
-		return
-	}
 	http.ServeContent(w, r, path.Base(name), info.ModTime(), f)
 }
 
