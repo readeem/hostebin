@@ -1,0 +1,298 @@
+<!doctype html>
+<!--
+  Metrics page — for benchmark results, log summaries, run statistics: a few
+  headline numbers, one chart, and the table the numbers came from.
+  The <head> is the shared shell; see shell.html.
+
+  The chart at the bottom of this file is hand-rolled SVG on purpose: it needs
+  no library, prints, and re-themes with the page. Keep it to one series in
+  `accent`; the moment a chart needs a second hue it probably wants to be a
+  table.
+-->
+<html lang="en" class="scroll-smooth">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>REPLACE: Metrics title</title>
+
+<!-- Favicon. An inline SVG data URI, so the tab icon costs no second file and
+     no request. Change the colour (and the glyph, from icons.md) so this report
+     is tellable apart from the other hostebin tabs the reader has open. -->
+<link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http%3A//www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='%230d9488' stroke-width='2.5' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpath d='M3 3v16a2 2 0 0 0 2 2h16'/%3E%3Cpath d='M18 17V9'/%3E%3Cpath d='M13 17V5'/%3E%3Cpath d='M8 17v-3'/%3E%3C/svg%3E">
+
+<script>(()=>{try{const s=localStorage.getItem('theme');
+document.documentElement.classList.toggle('dark',s?s==='dark':matchMedia('(prefers-color-scheme:dark)').matches);}catch(e){}})();</script>
+<style>html{background:#f7f8fa;color:#22262c;font:16px/1.6 ui-sans-serif,system-ui,sans-serif}html.dark{background:#101318;color:#e6e9ee}</style>
+<script src="https://cdn.jsdelivr.net/npm/@tailwindcss/browser@4"></script>
+<style type="text/tailwindcss">
+@custom-variant dark (&:where(.dark, .dark *));
+
+:root {
+  --canvas: oklch(0.975 0.003 265); --surface: oklch(1 0 0);
+  --ink: oklch(0.27 0.02 265);      --muted: oklch(0.52 0.015 265);
+  --line: oklch(0.91 0.006 265);    --code: oklch(0.965 0.004 265);
+  --accent: oklch(0.52 0.17 258);   --accent-soft: oklch(0.95 0.035 258);
+  --ok: oklch(0.52 0.14 150);       --ok-soft: oklch(0.95 0.045 150);
+  --warn: oklch(0.52 0.13 70);      --warn-soft: oklch(0.96 0.055 85);
+  --bad: oklch(0.52 0.19 25);       --bad-soft: oklch(0.95 0.04 25);
+}
+.dark {
+  --canvas: oklch(0.16 0.012 265); --surface: oklch(0.20 0.014 265);
+  --ink: oklch(0.93 0.008 265);    --muted: oklch(0.68 0.012 265);
+  --line: oklch(0.30 0.016 265);   --code: oklch(0.185 0.013 265);
+  --accent: oklch(0.74 0.13 258);  --accent-soft: oklch(0.26 0.035 258);
+  --ok: oklch(0.76 0.15 155);      --ok-soft: oklch(0.25 0.032 155);
+  --warn: oklch(0.80 0.14 80);     --warn-soft: oklch(0.26 0.033 80);
+  --bad: oklch(0.72 0.16 25);      --bad-soft: oklch(0.26 0.04 25);
+}
+@theme inline {
+  --color-canvas: var(--canvas); --color-surface: var(--surface);
+  --color-ink: var(--ink);       --color-muted: var(--muted);
+  --color-line: var(--line);     --color-code: var(--code);
+  --color-accent: var(--accent); --color-accent-soft: var(--accent-soft);
+  --color-ok: var(--ok);         --color-ok-soft: var(--ok-soft);
+  --color-warn: var(--warn);     --color-warn-soft: var(--warn-soft);
+  --color-bad: var(--bad);       --color-bad-soft: var(--bad-soft);
+}
+
+@layer components {
+  /* Icons. <svg class="icon"><use href="#i-name"/></svg> — see icons.md.
+     fill:none + stroke:currentColor is what makes one inherit text-bad,
+     text-muted, or anything else from the element it sits in. */
+  .icon { @apply inline-block size-4 shrink-0 align-[-0.125em];
+          fill: none; stroke: currentColor; stroke-width: 2;
+          stroke-linecap: round; stroke-linejoin: round; }
+
+  .tile { @apply rounded-lg border border-line bg-surface px-4 py-3.5; }
+  .tile-label { @apply text-xs font-medium tracking-wide text-muted uppercase; }
+  .tile-value { @apply mt-1 text-2xl font-semibold tabular-nums text-ink; }
+  th[data-sort] { @apply cursor-pointer select-none hover:text-ink; }
+}
+
+@media print {
+  :root { --canvas: #fff; --surface: #fff; --ink: #000; --muted: #444; --line: #bbb; --code: #f2f2f2; }
+  .no-print { display: none !important; }
+}
+</style>
+</head>
+
+<body class="bg-canvas text-ink antialiased">
+
+<!-- ── Icon sprite ───────────────────────────────────────────────────────
+     Lucide (ISC) pasted as <symbol>s: no icon request, no JS, one definition
+     however often an icon repeats. Add what the page needs from icons.md and
+     delete what it doesn't. The container is display:none; <use> still
+     resolves into it. -->
+<svg style="display:none" aria-hidden="true">
+  <symbol id="i-sun" viewBox="0 0 24 24"><circle cx="12" cy="12" r="4"/><path d="M12 2v2"/><path d="M12 20v2"/><path d="m4.93 4.93 1.41 1.41"/><path d="m17.66 17.66 1.41 1.41"/><path d="M2 12h2"/><path d="M20 12h2"/><path d="m6.34 17.66-1.41 1.41"/><path d="m19.07 4.93-1.41 1.41"/></symbol>
+  <symbol id="i-moon" viewBox="0 0 24 24"><path d="M20.985 12.486a9 9 0 1 1-9.473-9.472c.405-.022.617.46.402.803a6 6 0 0 0 8.268 8.268c.344-.215.825-.004.803.401"/></symbol>
+  <symbol id="i-trending-up" viewBox="0 0 24 24"><path d="M16 7h6v6"/><path d="m22 7-8.5 8.5-5-5L2 17"/></symbol>
+  <symbol id="i-trending-down" viewBox="0 0 24 24"><path d="M16 17h6v-6"/><path d="m22 17-8.5-8.5-5 5L2 7"/></symbol>
+  <symbol id="i-minus" viewBox="0 0 24 24"><path d="M5 12h14"/></symbol>
+  <symbol id="i-chevrons-up-down" viewBox="0 0 24 24"><path d="m7 15 5 5 5-5"/><path d="m7 9 5-5 5 5"/></symbol>
+  <symbol id="i-chevron-up" viewBox="0 0 24 24"><path d="m18 15-6-6-6 6"/></symbol>
+  <symbol id="i-chevron-down" viewBox="0 0 24 24"><path d="m6 9 6 6 6-6"/></symbol>
+</svg>
+
+<div class="mx-auto max-w-5xl px-5 py-10 sm:px-8 lg:py-14">
+
+  <header class="mb-8">
+    <div class="mb-3 flex items-start justify-between gap-4">
+      <p class="text-xs font-semibold tracking-widest text-accent uppercase">REPLACE: Run type</p>
+      <button id="theme-toggle" type="button"
+              class="no-print -mt-1 inline-flex shrink-0 items-center rounded-md border border-line p-1.5 text-muted hover:bg-surface hover:text-ink"
+              aria-label="Toggle dark mode" title="Toggle dark mode">
+        <svg class="icon dark:hidden" aria-hidden="true"><use href="#i-moon"/></svg>
+        <svg class="icon hidden dark:inline-block" aria-hidden="true"><use href="#i-sun"/></svg>
+      </button>
+    </div>
+    <h1 class="text-3xl font-semibold tracking-tight text-balance">REPLACE: What was measured</h1>
+    <p class="mt-3 max-w-[62ch] text-[0.975rem]/7 text-muted text-pretty">
+      REPLACE: what the numbers below mean and what changed since last time.
+    </p>
+  </header>
+
+  <!-- ── Headline numbers ──────────────────────────────────────────────── -->
+  <!-- Four at most. A number needs a unit and a comparison to mean anything.
+       The arrow gives the direction, the colour gives the verdict — note that
+       p95 rose and is therefore `bad`, while requests rose and are `ok`. -->
+  <section class="mb-10 grid grid-cols-2 gap-3 lg:grid-cols-4">
+    <div class="tile">
+      <p class="tile-label">Requests</p>
+      <p class="tile-value">1,284,902</p>
+      <p class="mt-1 text-xs text-muted">
+        <span class="inline-flex items-center gap-1 font-medium text-ok">
+          <svg class="icon size-3.5" aria-hidden="true"><use href="#i-trending-up"/></svg>+4.1%
+        </span> vs. last run
+      </p>
+    </div>
+    <div class="tile">
+      <p class="tile-label">p95 latency</p>
+      <p class="tile-value">184<span class="ml-0.5 text-base font-normal text-muted">ms</span></p>
+      <p class="mt-1 text-xs text-muted">
+        <span class="inline-flex items-center gap-1 font-medium text-bad">
+          <svg class="icon size-3.5" aria-hidden="true"><use href="#i-trending-up"/></svg>+22%
+        </span> vs. last run
+      </p>
+    </div>
+    <div class="tile">
+      <p class="tile-label">Error rate</p>
+      <p class="tile-value">0.13<span class="ml-0.5 text-base font-normal text-muted">%</span></p>
+      <p class="mt-1 text-xs text-muted">
+        <span class="inline-flex items-center gap-1 font-medium text-ok">
+          <svg class="icon size-3.5" aria-hidden="true"><use href="#i-trending-down"/></svg>−0.04pp
+        </span> vs. last run
+      </p>
+    </div>
+    <div class="tile">
+      <p class="tile-label">Bytes served</p>
+      <p class="tile-value">41.2<span class="ml-0.5 text-base font-normal text-muted">GiB</span></p>
+      <p class="mt-1 text-xs text-muted">
+        <svg class="icon mr-1 size-3.5 text-muted/60" aria-hidden="true"><use href="#i-minus"/></svg>no prior run
+      </p>
+    </div>
+  </section>
+
+  <!-- ── Chart ─────────────────────────────────────────────────────────── -->
+  <!-- Data is inlined as JSON: the CSP pins connect-src to 'self', so a page
+       cannot fetch it at runtime. Rendering to SVG keeps it crisp and printable. -->
+  <section class="mb-10">
+    <h2 class="mb-1 text-lg font-semibold tracking-tight">REPLACE: what this chart shows</h2>
+    <p class="mb-4 text-sm text-muted">REPLACE: the unit, and the window it covers.</p>
+
+    <script id="series" type="application/json">
+      [{"label":"Mon","value":128},{"label":"Tue","value":164},{"label":"Wed","value":141},
+       {"label":"Thu","value":203},{"label":"Fri","value":247},{"label":"Sat","value":92},
+       {"label":"Sun","value":76}]
+    </script>
+
+    <figure class="rounded-lg border border-line bg-surface p-4">
+      <svg id="chart" viewBox="0 0 720 220" class="w-full" role="img"
+           aria-label="REPLACE: describe the chart's shape for screen readers"></svg>
+    </figure>
+  </section>
+
+  <!-- ── The underlying table ──────────────────────────────────────────── -->
+  <!-- Always ship the numbers behind the chart. Click a header to sort. -->
+  <section>
+    <h2 class="mb-4 text-lg font-semibold tracking-tight">By endpoint</h2>
+    <div class="overflow-x-auto rounded-lg border border-line">
+      <table id="data" class="w-full border-collapse text-sm">
+        <thead class="bg-surface text-left">
+          <!-- The chevrons say "this is sortable" before anyone clicks; the
+               script swaps each one for an up or down arrow once it is. -->
+          <tr class="border-b border-line text-muted">
+            <th class="px-4 py-2.5 font-semibold" data-sort="text">
+              <span class="inline-flex items-center gap-1.5">Endpoint<svg class="sort-icon icon size-3.5 text-muted/50" aria-hidden="true"><use href="#i-chevrons-up-down"/></svg></span>
+            </th>
+            <th class="px-4 py-2.5 text-right font-semibold" data-sort="num">
+              <span class="inline-flex items-center gap-1.5">Requests<svg class="sort-icon icon size-3.5 text-muted/50" aria-hidden="true"><use href="#i-chevrons-up-down"/></svg></span>
+            </th>
+            <th class="px-4 py-2.5 text-right font-semibold" data-sort="num">
+              <span class="inline-flex items-center gap-1.5">p95 (ms)<svg class="sort-icon icon size-3.5 text-muted/50" aria-hidden="true"><use href="#i-chevrons-up-down"/></svg></span>
+            </th>
+            <th class="px-4 py-2.5 text-right font-semibold" data-sort="num">
+              <span class="inline-flex items-center gap-1.5">Errors<svg class="sort-icon icon size-3.5 text-muted/50" aria-hidden="true"><use href="#i-chevrons-up-down"/></svg></span>
+            </th>
+          </tr>
+        </thead>
+        <tbody class="divide-y divide-line">
+          <tr><td class="px-4 py-2.5 font-mono text-xs">POST /api/v1/bundles</td><td class="px-4 py-2.5 text-right tabular-nums">412,004</td><td class="px-4 py-2.5 text-right tabular-nums">241</td><td class="px-4 py-2.5 text-right tabular-nums text-bad">308</td></tr>
+          <tr><td class="px-4 py-2.5 font-mono text-xs">GET /b/{id}/</td><td class="px-4 py-2.5 text-right tabular-nums">803,551</td><td class="px-4 py-2.5 text-right tabular-nums">62</td><td class="px-4 py-2.5 text-right tabular-nums">14</td></tr>
+          <tr><td class="px-4 py-2.5 font-mono text-xs">GET /api/v1/bundles</td><td class="px-4 py-2.5 text-right tabular-nums">61,209</td><td class="px-4 py-2.5 text-right tabular-nums">88</td><td class="px-4 py-2.5 text-right tabular-nums">0</td></tr>
+          <tr><td class="px-4 py-2.5 font-mono text-xs">GET /healthz</td><td class="px-4 py-2.5 text-right tabular-nums">8,138</td><td class="px-4 py-2.5 text-right tabular-nums">3</td><td class="px-4 py-2.5 text-right tabular-nums">0</td></tr>
+        </tbody>
+      </table>
+    </div>
+  </section>
+
+  <footer class="mt-12 border-t border-line pt-5 text-sm text-muted">
+    REPLACE: where this data came from and over what window.
+  </footer>
+</div>
+
+<script>
+// ── Chart ──────────────────────────────────────────────────────────────
+// Hand-rolled SVG: no chart library to load, and it inherits the theme tokens
+// through currentColor, so it re-themes with the page for free.
+(() => {
+  const svg = document.getElementById('chart');
+  const raw = document.getElementById('series')?.textContent;
+  if (!svg || !raw) return;
+
+  let data;
+  try { data = JSON.parse(raw); } catch (e) { return; }
+  if (!data.length) return;
+
+  const W = 720, H = 220, padL = 44, padR = 8, padT = 12, padB = 28;
+  const max = Math.ceil(Math.max(...data.map(d => d.value)) * 1.1);
+  const plotW = W - padL - padR, plotH = H - padT - padB;
+  const barW = plotW / data.length;
+  const ns = 'http://www.w3.org/2000/svg';
+  const el = (name, attrs, text) => {
+    const n = document.createElementNS(ns, name);
+    for (const [k, v] of Object.entries(attrs)) n.setAttribute(k, v);
+    if (text != null) n.textContent = text;
+    return n;
+  };
+
+  // Gridlines and y labels. Four ticks is enough to read a value off.
+  for (let i = 0; i <= 4; i++) {
+    const y = padT + plotH - (plotH * i) / 4;
+    svg.append(el('line', { x1: padL, x2: W - padR, y1: y, y2: y, stroke: 'currentColor', 'stroke-opacity': i ? 0.12 : 0.3 }));
+    svg.append(el('text', { x: padL - 8, y: y + 4, 'text-anchor': 'end', 'font-size': 11, fill: 'currentColor', 'fill-opacity': 0.6 },
+      Math.round((max * i) / 4).toLocaleString()));
+  }
+
+  data.forEach((d, i) => {
+    const h = (d.value / max) * plotH;
+    const x = padL + i * barW + barW * 0.18;
+    const w = barW * 0.64;
+    const bar = el('rect', { x, y: padT + plotH - h, width: w, height: h, rx: 3, fill: 'var(--accent)' });
+    bar.append(el('title', {}, `${d.label}: ${d.value.toLocaleString()}`));
+    svg.append(bar);
+    svg.append(el('text', { x: x + w / 2, y: H - 8, 'text-anchor': 'middle', 'font-size': 11, fill: 'currentColor', 'fill-opacity': 0.6 }, d.label));
+  });
+})();
+
+// ── Sortable table ─────────────────────────────────────────────────────
+// The table is already in a sensible order in the HTML; this only reorders it.
+(() => {
+  const table = document.getElementById('data');
+  if (!table) return;
+  const tbody = table.tBodies[0];
+  for (const th of table.querySelectorAll('th[data-sort]')) {
+    let asc = false;
+    th.addEventListener('click', () => {
+      asc = !asc;
+      const i = [...th.parentNode.children].indexOf(th);
+      const numeric = th.dataset.sort === 'num';
+      const rows = [...tbody.rows].sort((a, b) => {
+        const x = a.cells[i].textContent.trim(), y = b.cells[i].textContent.trim();
+        const cmp = numeric
+          ? parseFloat(x.replace(/[^0-9.-]/g, '')) - parseFloat(y.replace(/[^0-9.-]/g, ''))
+          : x.localeCompare(y);
+        return asc ? cmp : -cmp;
+      });
+      tbody.append(...rows);
+      for (const other of table.querySelectorAll('th[data-sort]')) {
+        other.removeAttribute('aria-sort');
+        const icon = other.querySelector('.sort-icon');
+        icon?.querySelector('use')?.setAttribute('href', '#i-chevrons-up-down');
+        icon?.classList.replace('text-ink', 'text-muted/50');
+      }
+      th.setAttribute('aria-sort', asc ? 'ascending' : 'descending');
+      const icon = th.querySelector('.sort-icon');
+      icon?.querySelector('use')?.setAttribute('href', asc ? '#i-chevron-up' : '#i-chevron-down');
+      icon?.classList.replace('text-muted/50', 'text-ink');
+    });
+  }
+})();
+
+document.getElementById('theme-toggle')?.addEventListener('click', () => {
+  const dark = document.documentElement.classList.toggle('dark');
+  try { localStorage.setItem('theme', dark ? 'dark' : 'light'); } catch (e) {}
+});
+</script>
+</body>
+</html>

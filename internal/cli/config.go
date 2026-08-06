@@ -41,6 +41,7 @@ type Config struct {
 	MaxFiles     int    `json:"max-files"`
 	DefaultTTL   string `json:"default-ttl"`
 	CSP          string `json:"csp"`
+	BundleHost   string `json:"bundle-host"`
 	autogenerate bool   `json:"-"`
 }
 
@@ -184,6 +185,7 @@ func (cfg *Config) registerServeFlags(fs *flag.FlagSet) {
 	fs.IntVar(&cfg.MaxFiles, "max-files", cfg.MaxFiles, "maximum files per bundle")
 	fs.StringVar(&cfg.DefaultTTL, "default-ttl", cfg.DefaultTTL, "default expiry duration or never")
 	fs.StringVar(&cfg.CSP, "csp", cfg.CSP, "Content-Security-Policy value; off disables it")
+	fs.StringVar(&cfg.BundleHost, "bundle-host", cfg.BundleHost, "serve bundles from their own subdomain, for example *.paste.example.com")
 }
 
 // parseConfig applies ff's native precedence: CLI, environment, then JSON.
@@ -216,6 +218,7 @@ var configKeys = map[string]struct{}{
 	"acme-domain": {}, "acme-email": {},
 	"tailscale": {}, "funnel": {}, "ts-hostname": {}, "ts-auth-key": {},
 	"max-upload": {}, "max-files": {}, "default-ttl": {}, "csp": {},
+	"bundle-host": {},
 }
 
 func resolveClientConfig(cfg *Config) error {

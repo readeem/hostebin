@@ -47,6 +47,10 @@ func runServe(args []string, stderr io.Writer) int {
 		logger.Error().Err(err).Msg("invalid HTTP listener")
 		return exitUsage
 	}
+	if httpAddr == "" && cfg.TLSCert == "" && cfg.TLSKey == "" && cfg.ACMEDomain == "" && !cfg.Tailscale && !cfg.Funnel {
+		logger.Error().Msg("HTTP listener is disabled because port is 0, and no TLS, ACME, or Tailscale listener is enabled; set --port to a value between 1 and 65535 or enable another listener")
+		return exitUsage
+	}
 	st, err := store.New(cfg.Data)
 	if err != nil {
 		logger.Error().Err(err).Msg("initialize storage")
@@ -107,6 +111,10 @@ func runServe(args []string, stderr io.Writer) int {
 	if csp == "" {
 		csp = server.DefaultCSP
 	}
+	if cfg.BundleHost != "" && cfg.ACMEDomain != "" {
+		logger.Error().Msg("--bundle-host cannot be combined with --acme-domain: built-in ACME cannot issue a wildcard certificate, and would publish every bundle id to Certificate Transparency logs. Terminate TLS at a reverse proxy holding a wildcard certificate, or supply one with --tls-cert/--tls-key")
+		return exitUsage
+	}
 	app, err := server.New(
 		server.Config{
 			Store:      st,
@@ -115,6 +123,7 @@ func runServe(args []string, stderr io.Writer) int {
 			MaxFiles:   cfg.MaxFiles,
 			DefaultTTL: defaultTTL,
 			CSP:        csp,
+			BundleHost: cfg.BundleHost,
 			Logger:     logger,
 		},
 	)

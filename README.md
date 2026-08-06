@@ -239,7 +239,8 @@ names:
   "max-upload": "32MiB",
   "max-files": 64,
   "default-ttl": "never",
-  "csp": ""
+  "csp": "",
+  "bundle-host": ""
 }
 ```
 
@@ -274,6 +275,28 @@ a reverse proxy, forward the original `Host` and set `X-Forwarded-Proto`.
 Useful server settings: `--max-upload` (default `32MiB`), `--max-files` (default `64`),
 `--default-ttl` (default `never`), `--csp` (`off` disables it). Expired bundles 404
 immediately; a sweep at startup and every ten minutes reclaims their files.
+
+### Per-bundle origins
+
+`--bundle-host '*.paste.example.com'` serves each bundle from its own subdomain —
+`<id>.paste.example.com` — instead of `/b/<id>/`. Every bundle then gets a distinct
+browser origin, so one cannot read another's `localStorage` or fetch its files, and
+the API is cross-origin to all of them. Existing `/b/<id>/…` links 301 to the new
+origin, and upload responses return the subdomain form, so no client changes.
+
+Requires a **wildcard certificate**, which the built-in ACME support cannot issue:
+`autocert` implements only `http-01` and `tls-alpn-01`, while Let's Encrypt issues
+wildcards only over `dns-01`. Combining `--bundle-host` with `--acme-domain` is a
+startup error rather than a silent fallback — per-host issuance would publish every
+bundle id to the public Certificate Transparency logs, defeating the point of an
+unguessable link. Terminate TLS at a reverse proxy holding `*.paste.example.com`
+(forwarding the original `Host` and `X-Forwarded-Proto`), or pass the certificate
+with `--tls-cert`/`--tls-key`.
+
+Note that the id moves from the URL path into the hostname, so it becomes visible
+to DNS resolvers and to anyone on the network path via TLS SNI. Bundle responses
+send `Referrer-Policy: no-referrer` so the id is not handed to third-party origins
+the page loads from.
 
 The `.deb`, `.rpm`, and Arch packages install a hardened systemd unit:
 
@@ -341,13 +364,27 @@ Hosted files are untrusted. The server never uses cookie authentication, sends
 `application/octet-stream`. Bundle responses carry this default CSP:
 
 ```text
-default-src 'self' data: blob: https: 'unsafe-inline' 'unsafe-eval'; connect-src 'self'; form-action 'none'; frame-ancestors 'none'
+default-src 'self' data: blob: https: 'unsafe-inline' 'unsafe-eval'; connect-src 'self' https:; form-action 'none'; frame-ancestors 'none'
 ```
 
 Inline scripts/styles and HTTPS CDN assets are intentionally allowed because generated
-reports need them. This is not full isolation: bundles share an origin, so malicious
-content can reach another bundle whose unguessable ID it knows. Per-bundle origins are
-out of scope for v1.
+reports need them, and `connect-src` permits HTTPS so a report can render live data.
+Plain HTTP is deliberately excluded: it keeps a published page from probing the
+reader's own network (`http://192.168.x.x`, `http://localhost:11434`) from their
+browser.
+
+This is not a sandbox. `script-src` falls back to `https:`, so a bundle can already
+load and execute code from any HTTPS origin, and `img-src` can carry data outward in a
+URL — the CSP limits accidents, not a malicious uploader. The threat model is that
+whoever holds the upload token is trusted, and the reader and their network are not.
+
+By default bundles share an origin, so content can reach another bundle whose
+unguessable ID it knows. `--bundle-host` gives each bundle its own origin and removes
+that class entirely; see [Per-bundle origins](#per-bundle-origins).
+
+**While bundles share an origin with the API, the API must never accept ambient
+credentials.** It is bearer-token only for exactly this reason: a cookie session would
+let any published page call `/api/v1/*` with the reader's credentials.
 
 Writes stage in hidden temporary directories before an atomic rename; reads go through
 `os.OpenRoot`, so `..` and symlinks cannot escape the storage root.

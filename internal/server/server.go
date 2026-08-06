@@ -5,6 +5,7 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
+	"net"
 	"net/http"
 	"net/url"
 	"os"
@@ -17,7 +18,10 @@ import (
 	"github.com/rs/zerolog"
 )
 
-const DefaultCSP = "default-src 'self' data: blob: https: 'unsafe-inline' 'unsafe-eval'; connect-src 'self'; form-action 'none'; frame-ancestors 'none'"
+// DefaultCSP lets a page reach any HTTPS origin so reports can pull live data,
+// but not plain HTTP — that keeps a published page from probing the reader's
+// LAN (http://192.168.x.x, http://localhost:11434) from their browser.
+const DefaultCSP = "default-src 'self' data: blob: https: 'unsafe-inline' 'unsafe-eval'; connect-src 'self' https:; form-action 'none'; frame-ancestors 'none'"
 
 type Config struct {
 	Store      *store.Store
@@ -26,6 +30,7 @@ type Config struct {
 	MaxFiles   int
 	DefaultTTL time.Duration
 	CSP        string
+	BundleHost string
 	Logger     *zerolog.Logger
 }
 
@@ -50,6 +55,13 @@ func New(cfg Config) (*Server, error) {
 	}
 	if cfg.CSP == "" {
 		cfg.CSP = DefaultCSP
+	}
+	if cfg.BundleHost != "" {
+		normalized, err := NormalizeBundleHost(cfg.BundleHost)
+		if err != nil {
+			return nil, err
+		}
+		cfg.BundleHost = normalized
 	}
 	if cfg.Logger == nil {
 		cfg.Logger = logging.NewConsole(os.Stderr)
@@ -76,8 +88,24 @@ func New(cfg Config) (*Server, error) {
 	mux.HandleFunc("PUT /api/v1/users/{id}/token", s.auth(s.rotateToken))
 	mux.HandleFunc("DELETE /api/v1/users/{id}/token", s.auth(s.revokeToken))
 	mux.HandleFunc("GET /b/{id}/{path...}", s.serveBundle)
+
 	s.handler = http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		w.Header().Set("X-Content-Type-Options", "nosniff")
+		// A request that arrives on a bundle subdomain never reaches the mux, so
+		// the API is unreachable from bundle content even if a page tries.
+		if id, ok := s.bundleHostID(r.Host); ok {
+			if hasTraversalSegment(r.URL.Path) {
+				http.Error(w, "invalid bundle path", http.StatusBadRequest)
+				return
+			}
+			if r.Method != http.MethodGet && r.Method != http.MethodHead {
+				w.Header().Set("Allow", "GET, HEAD")
+				http.Error(w, "method not allowed", http.StatusMethodNotAllowed)
+				return
+			}
+			s.serveBundleContent(w, r, id, strings.TrimPrefix(r.URL.Path, "/"))
+			return
+		}
 		if strings.HasPrefix(r.URL.Path, "/b/") && hasTraversalSegment(r.URL.Path) {
 			http.Error(w, "invalid bundle path", http.StatusBadRequest)
 			return
@@ -88,6 +116,59 @@ func New(cfg Config) (*Server, error) {
 }
 
 func (s *Server) Handler() http.Handler { return s.handler }
+
+func NormalizeBundleHost(pattern string) (string, error) {
+	h := strings.ToLower(strings.TrimSpace(pattern))
+	h = strings.TrimSuffix(h, ".")
+	rest, ok := strings.CutPrefix(h, "*.")
+	if !ok {
+		return "", fmt.Errorf("bundle host %q must be a wildcard such as *.example.com", pattern)
+	}
+	if rest == "" || strings.Contains(rest, "*") || strings.HasPrefix(rest, ".") {
+		return "", fmt.Errorf("bundle host %q must be a wildcard such as *.example.com", pattern)
+	}
+	for _, r := range rest {
+		if !(r >= 'a' && r <= 'z' || r >= '0' && r <= '9' || r == '.' || r == '-') {
+			return "", fmt.Errorf("bundle host %q contains an invalid character %q", pattern, r)
+		}
+	}
+	return "*." + rest, nil
+}
+
+// bundleHostID returns the bundle id a request's Host addresses, if the server
+// is running in subdomain mode and the host matches the configured wildcard.
+func (s *Server) bundleHostID(host string) (string, bool) {
+	if s.cfg.BundleHost == "" || host == "" {
+		return "", false
+	}
+	if h, _, err := net.SplitHostPort(host); err == nil {
+		host = h
+	}
+	host = strings.ToLower(strings.TrimSuffix(host, "."))
+	label, ok := strings.CutSuffix(host, s.cfg.BundleHost[1:])
+	if !ok || label == "" || strings.Contains(label, ".") {
+		return "", false
+	}
+	return label, true
+}
+
+// bundleRoot is the URL a bundle's files hang off, with no trailing slash.
+func (s *Server) bundleRoot(r *http.Request, id string) string {
+	base := baseURL(r)
+	if s.cfg.BundleHost == "" {
+		return base + "/b/" + id
+	}
+	scheme, port := "https", ""
+	if u, err := url.Parse(base); err == nil {
+		if u.Scheme != "" {
+			scheme = u.Scheme
+		}
+		if p := u.Port(); p != "" {
+			port = ":" + p
+		}
+	}
+	return scheme + "://" + id + s.cfg.BundleHost[1:] + port
+}
 
 func hasTraversalSegment(name string) bool {
 	for segment := range strings.SplitSeq(name, "/") {
@@ -171,10 +252,11 @@ func statusForStoreError(err error) int {
 	return http.StatusInternalServerError
 }
 
-func fileURL(base, id, name string) string {
+// fileURL joins a bundle root and a stored file name into a fetchable URL.
+func fileURL(root, name string) string {
 	parts := strings.Split(name, "/")
 	for i := range parts {
 		parts[i] = url.PathEscape(parts[i])
 	}
-	return fmt.Sprintf("%s/b/%s/%s", strings.TrimRight(base, "/"), id, strings.Join(parts, "/"))
+	return strings.TrimRight(root, "/") + "/" + strings.Join(parts, "/")
 }

@@ -62,7 +62,7 @@ func (s *Server) createBundle(w http.ResponseWriter, r *http.Request, principal 
 		Int("file_count", len(meta.Files)).
 		Int64("byte_count", meta.Bytes).
 		Msg("bundle created")
-	writeJSON(w, http.StatusCreated, makeUploadResponse(baseURL(r), meta))
+	writeJSON(w, http.StatusCreated, s.makeUploadResponse(r, meta))
 }
 
 func (s *Server) updateBundle(w http.ResponseWriter, r *http.Request, principal users.Principal) {
@@ -99,7 +99,7 @@ func (s *Server) updateBundle(w http.ResponseWriter, r *http.Request, principal 
 		Int("file_count", len(meta.Files)).
 		Int64("byte_count", meta.Bytes).
 		Msg("bundle updated")
-	writeJSON(w, http.StatusOK, makeUploadResponse(baseURL(r), meta))
+	writeJSON(w, http.StatusOK, s.makeUploadResponse(r, meta))
 }
 
 func (s *Server) parseUpload(w http.ResponseWriter, r *http.Request) (parsedUpload, bool) {
@@ -235,13 +235,14 @@ func ParseDuration(raw string) (time.Duration, error) {
 	return time.ParseDuration(s)
 }
 
-func makeUploadResponse(base string, meta *store.BundleMeta) uploadResponse {
-	resp := uploadResponse{ID: meta.ID, URL: fmt.Sprintf("%s/b/%s/", strings.TrimRight(base, "/"), meta.ID), ExpiresAt: meta.ExpiresAt}
+func (s *Server) makeUploadResponse(r *http.Request, meta *store.BundleMeta) uploadResponse {
+	root := s.bundleRoot(r, meta.ID)
+	resp := uploadResponse{ID: meta.ID, URL: root + "/", ExpiresAt: meta.ExpiresAt}
 	if meta.Entry != "" {
-		resp.EntryURL = fileURL(base, meta.ID, meta.Entry)
+		resp.EntryURL = fileURL(root, meta.Entry)
 	}
 	for _, f := range meta.Files {
-		resp.Files = append(resp.Files, responseFile{Name: f.Name, Size: f.Size, URL: fileURL(base, meta.ID, f.Name)})
+		resp.Files = append(resp.Files, responseFile{Name: f.Name, Size: f.Size, URL: fileURL(root, f.Name)})
 	}
 	return resp
 }

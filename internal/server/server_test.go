@@ -3,8 +3,10 @@ package server
 import (
 	"bytes"
 	"encoding/json"
+	"fmt"
 	"io"
 	"mime/multipart"
+	"net"
 	"net/http"
 	"net/http/httptest"
 	"net/textproto"
@@ -315,6 +317,179 @@ func TestCRUDActionLogging(t *testing.T) {
 	}
 	if got := events["update"]["mode"]; got != "merge" {
 		t.Errorf("update mode = %v, want merge", got)
+	}
+}
+
+func TestNormalizeBundleHost(t *testing.T) {
+	for _, tc := range []struct {
+		in, want string
+	}{
+		{"*.paste.example.com", "*.paste.example.com"},
+		{"*.PASTE.example.com.", "*.paste.example.com"},
+		{" *.localhost ", "*.localhost"},
+	} {
+		got, err := NormalizeBundleHost(tc.in)
+		if err != nil || got != tc.want {
+			t.Errorf("NormalizeBundleHost(%q) = %q, %v; want %q", tc.in, got, err, tc.want)
+		}
+	}
+	// A wildcard certificate covers one label, so anything else must be rejected
+	// rather than silently serving from a host the certificate does not match.
+	for _, bad := range []string{"paste.example.com", "*.", "*", "*.*.example.com", "*..example.com", "*.exa mple.com"} {
+		if got, err := NormalizeBundleHost(bad); err == nil {
+			t.Errorf("NormalizeBundleHost(%q) = %q, want error", bad, got)
+		}
+	}
+}
+
+func bundleHostServer(t *testing.T) (*Server, *httptest.Server) {
+	t.Helper()
+	dataDir := t.TempDir()
+	st, err := store.New(dataDir)
+	if err != nil {
+		t.Fatal(err)
+	}
+	userStore, err := filestore.Open(dataDir)
+	if err != nil {
+		t.Fatal(err)
+	}
+	t.Cleanup(func() { _ = userStore.Close() })
+	userService := users.NewService(userStore)
+	if _, _, err := userService.Bootstrap(t.Context(), "test-token"); err != nil {
+		t.Fatal(err)
+	}
+	app, err := New(Config{Store: st, Users: userService, BundleHost: "*.paste.example.com"})
+	if err != nil {
+		t.Fatal(err)
+	}
+	ts := httptest.NewServer(app.Handler())
+	t.Cleanup(ts.Close)
+	return app, ts
+}
+
+func TestBundleHostID(t *testing.T) {
+	app, _ := bundleHostServer(t)
+	for _, tc := range []struct {
+		host, want string
+	}{
+		{"abc123.paste.example.com", "abc123"},
+		{"ABC123.paste.example.com", "abc123"},
+		{"abc123.paste.example.com:8443", "abc123"},
+		{"abc123.paste.example.com.", "abc123"},
+	} {
+		if got, ok := app.bundleHostID(tc.host); !ok || got != tc.want {
+			t.Errorf("bundleHostID(%q) = %q, %v; want %q", tc.host, got, ok, tc.want)
+		}
+	}
+	// The apex must not resolve to a bundle, or the API would be shadowed; a
+	// deeper label must not either, since a wildcard certificate cannot cover it.
+	for _, host := range []string{"paste.example.com", "a.b.paste.example.com", "other.example.com", ""} {
+		if got, ok := app.bundleHostID(host); ok {
+			t.Errorf("bundleHostID(%q) = %q, true; want no match", host, got)
+		}
+	}
+}
+
+func TestBundleHostServesAndIsolates(t *testing.T) {
+	_, ts := bundleHostServer(t)
+	resp, result := rawUpload(t, ts, "index.html", "<h1>Sub</h1>", "test-token")
+	if resp.StatusCode != http.StatusCreated {
+		t.Fatalf("upload = %d", resp.StatusCode)
+	}
+
+	// The upload response advertises the per-bundle origin, carrying the test
+	// server's port so the URL stays fetchable.
+	host := result.ID + ".paste.example.com"
+	port := ts.Listener.Addr().(*net.TCPAddr).Port
+	wantURL := fmt.Sprintf("http://%s:%d/", host, port)
+	if result.URL != wantURL {
+		t.Fatalf("url = %q, want %q", result.URL, wantURL)
+	}
+
+	get := func(target, hostHeader string) *http.Response {
+		t.Helper()
+		req, _ := http.NewRequest(http.MethodGet, target, nil)
+		req.Host = hostHeader
+		out, err := http.DefaultTransport.RoundTrip(req)
+		if err != nil {
+			t.Fatal(err)
+		}
+		return out
+	}
+
+	served := get(ts.URL+"/index.html", host)
+	defer served.Body.Close()
+	body, _ := io.ReadAll(served.Body)
+	if served.StatusCode != http.StatusOK || string(body) != "<h1>Sub</h1>" {
+		t.Fatalf("subdomain fetch = %d %q", served.StatusCode, body)
+	}
+	if got := served.Header.Get("Referrer-Policy"); got != "no-referrer" {
+		t.Fatalf("Referrer-Policy = %q, want no-referrer; the id is the origin", got)
+	}
+
+	// The API must be unreachable from a bundle origin, so page content cannot
+	// reach the control plane even with same-origin credentials.
+	api := get(ts.URL+"/api/v1/bundles", host)
+	api.Body.Close()
+	if api.StatusCode != http.StatusNotFound {
+		t.Fatalf("api on bundle host = %d, want 404", api.StatusCode)
+	}
+	post, _ := http.NewRequest(http.MethodPost, ts.URL+"/api/v1/bundles", strings.NewReader("x"))
+	post.Host = host
+	post.Header.Set("Authorization", "Bearer test-token")
+	post.Header.Set("X-Hostebin-Filename", "a.html")
+	posted, err := http.DefaultTransport.RoundTrip(post)
+	if err != nil {
+		t.Fatal(err)
+	}
+	posted.Body.Close()
+	if posted.StatusCode != http.StatusMethodNotAllowed {
+		t.Fatalf("POST on bundle host = %d, want 405", posted.StatusCode)
+	}
+
+	traversal := get(ts.URL+"/../../etc/passwd", host)
+	traversal.Body.Close()
+	if traversal.StatusCode != http.StatusBadRequest {
+		t.Fatalf("traversal on bundle host = %d, want 400", traversal.StatusCode)
+	}
+}
+
+func TestBundleHostRedirectsLegacyPaths(t *testing.T) {
+	_, ts := bundleHostServer(t)
+	if _, result := rawUpload(t, ts, "index.html", "<h1>Sub</h1>", "test-token"); result.ID != "" {
+		client := &http.Client{CheckRedirect: func(*http.Request, []*http.Request) error { return http.ErrUseLastResponse }}
+		moved, err := client.Get(ts.URL + "/b/" + result.ID + "/index.html?raw=1")
+		if err != nil {
+			t.Fatal(err)
+		}
+		moved.Body.Close()
+		if moved.StatusCode != http.StatusMovedPermanently {
+			t.Fatalf("legacy path = %d, want 301", moved.StatusCode)
+		}
+		port := ts.Listener.Addr().(*net.TCPAddr).Port
+		want := fmt.Sprintf("http://%s.paste.example.com:%d/index.html?raw=1", result.ID, port)
+		if got := moved.Header.Get("Location"); got != want {
+			t.Fatalf("Location = %q, want %q", got, want)
+		}
+	}
+}
+
+func TestDefaultCSPAllowsHTTPSFetchOnly(t *testing.T) {
+	_, ts := testServer(t, 1024, 4)
+	_, result := rawUpload(t, ts, "index.html", "<h1>Hi</h1>", "test-token")
+	fetched, err := http.Get(result.URL)
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer fetched.Body.Close()
+	csp := fetched.Header.Get("Content-Security-Policy")
+	// 'self' https: and not '*': a page may call an HTTPS API but must not be
+	// able to probe http://192.168.x.x on the reader's network.
+	if !strings.Contains(csp, "connect-src 'self' https:") {
+		t.Fatalf("CSP = %q, want connect-src 'self' https:", csp)
+	}
+	if strings.Contains(csp, "connect-src *") {
+		t.Fatalf("CSP = %q, must not allow plain HTTP origins", csp)
 	}
 }
 
