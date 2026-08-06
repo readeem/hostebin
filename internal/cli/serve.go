@@ -47,6 +47,10 @@ func runServe(args []string, stderr io.Writer) int {
 		logger.Error().Err(err).Msg("invalid HTTP listener")
 		return exitUsage
 	}
+	if httpAddr == "" && cfg.TLSCert == "" && cfg.TLSKey == "" && cfg.ACMEDomain == "" && !cfg.Tailscale && !cfg.Funnel {
+		logger.Error().Msg("HTTP listener is disabled because port is 0, and no TLS, ACME, or Tailscale listener is enabled; set --port to a value between 1 and 65535 or enable another listener")
+		return exitUsage
+	}
 	st, err := store.New(cfg.Data)
 	if err != nil {
 		logger.Error().Err(err).Msg("initialize storage")
