@@ -81,6 +81,10 @@ func runServe(args []string, stderr io.Writer) int {
 	if csp == "" {
 		csp = server.DefaultCSP
 	}
+	if cfg.BundleHost != "" && cfg.ACMEDomain != "" {
+		logger.Error().Msg("--bundle-host cannot be combined with --acme-domain: built-in ACME cannot issue a wildcard certificate, and would publish every bundle id to Certificate Transparency logs. Terminate TLS at a reverse proxy holding a wildcard certificate, or supply one with --tls-cert/--tls-key")
+		return exitUsage
+	}
 	app, err := server.New(
 		server.Config{
 			Store:      st,
@@ -89,6 +93,7 @@ func runServe(args []string, stderr io.Writer) int {
 			MaxFiles:   cfg.MaxFiles,
 			DefaultTTL: defaultTTL,
 			CSP:        csp,
+			BundleHost: cfg.BundleHost,
 			Logger:     logger,
 		},
 	)
