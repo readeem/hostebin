@@ -2,37 +2,25 @@ package store
 
 import (
 	"errors"
-	"os"
-	"path/filepath"
-	"strings"
 	"time"
 )
 
 func (s *Store) SweepExpired() (int, error) {
-	entries, err := os.ReadDir(s.bundlesDir)
-	if err != nil {
+	var expired []string
+	if err := s.walk(func(meta *BundleMeta) error {
+		if meta.expired() {
+			expired = append(expired, meta.ID)
+		}
+		return nil
+	}); err != nil {
 		return 0, err
 	}
-	removed := 0
-	for _, entry := range entries {
-		if !entry.IsDir() || strings.HasPrefix(entry.Name(), ".") {
-			continue
-		}
-		_, err := s.Get(entry.Name())
-		if errors.Is(err, ErrExpired) {
-			trash := filepath.Join(s.bundlesDir, ".trash-"+entry.Name())
-			if renameErr := os.Rename(s.bundleDir(entry.Name()), trash); renameErr != nil {
-				return removed, renameErr
-			}
-			if removeErr := os.RemoveAll(trash); removeErr != nil {
-				return removed, removeErr
-			}
-			removed++
-		} else if err != nil && !errors.Is(err, ErrNotFound) {
-			return removed, err
+	for i, id := range expired {
+		if err := s.remove(id); err != nil && !errors.Is(err, ErrNotFound) {
+			return i, err
 		}
 	}
-	return removed, nil
+	return len(expired), nil
 }
 
 func (s *Store) RunGC(stop <-chan struct{}, interval time.Duration, report func(int, error)) {

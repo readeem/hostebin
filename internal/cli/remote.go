@@ -1,6 +1,8 @@
 package cli
 
 import (
+	"bytes"
+	"cmp"
 	"encoding/json"
 	"flag"
 	"fmt"
@@ -13,6 +15,8 @@ import (
 
 type listedBundle struct {
 	ID, Title, Entry string
+	OwnerID          string     `json:"owner_id"`
+	Owner            string     `json:"owner"`
 	CreatedAt        time.Time  `json:"created_at"`
 	ExpiresAt        *time.Time `json:"expires_at"`
 	Bytes            int64
@@ -28,10 +32,11 @@ func runLS(args []string, stdout, stderr io.Writer) int {
 	fs := flag.NewFlagSet("ls", flag.ContinueOnError)
 	fs.SetOutput(stderr)
 
-	var jsonOutput bool
+	var jsonOutput, all bool
 
 	cfg.registerClientFlags(fs)
 	boolVar(fs, &jsonOutput, "json", "print JSON")
+	boolVar(fs, &all, "all", "list every user's bundles (admin only)")
 
 	if err := parseConfig(fs, args); err != nil {
 		return exitUsage
@@ -44,7 +49,11 @@ func runLS(args []string, stdout, stderr io.Writer) int {
 		fmt.Fprintln(stderr, "hostebin:", err)
 		return exitUsage
 	}
-	body, status, err := request(http.MethodGet, cfg.Server+"/api/v1/bundles", cfg.Token)
+	endpoint := cfg.Server + "/api/v1/bundles"
+	if all {
+		endpoint += "?all=1"
+	}
+	body, status, err := request(http.MethodGet, endpoint, cfg.Token)
 	if err != nil {
 		fmt.Fprintln(stderr, "hostebin:", err)
 		return exitNetwork
@@ -74,7 +83,14 @@ func runLS(args []string, stdout, stderr io.Writer) int {
 		if title == "" {
 			title = b.Entry
 		}
-		fmt.Fprintf(stdout, "%s\t%d\t%s\t%s\n", b.ID, b.Bytes, b.CreatedAt.Format(time.RFC3339), title)
+		// The server ignores ?all=1 for non-admins and strips the owner, so the
+		// column only appears when it actually carries something.
+		owner := cmp.Or(b.Owner, b.OwnerID)
+		if all && owner != "" {
+			fmt.Fprintf(stdout, "%s\t%s\t%d\t%s\t%s\n", b.ID, owner, b.Bytes, b.CreatedAt.Format(time.RFC3339), title)
+		} else {
+			fmt.Fprintf(stdout, "%s\t%d\t%s\t%s\n", b.ID, b.Bytes, b.CreatedAt.Format(time.RFC3339), title)
+		}
 	}
 	return exitOK
 }
@@ -114,11 +130,26 @@ func runRM(args []string, stdout, stderr io.Writer) int {
 }
 
 func request(method, endpoint, token string) ([]byte, int, error) {
-	req, err := http.NewRequest(method, endpoint, nil)
+	return requestJSON(method, endpoint, token, nil)
+}
+
+func requestJSON(method, endpoint, token string, value any) ([]byte, int, error) {
+	var requestBody io.Reader
+	if value != nil {
+		encoded, err := json.Marshal(value)
+		if err != nil {
+			return nil, 0, err
+		}
+		requestBody = bytes.NewReader(encoded)
+	}
+	req, err := http.NewRequest(method, endpoint, requestBody)
 	if err != nil {
 		return nil, 0, err
 	}
 	req.Header.Set("Authorization", "Bearer "+token)
+	if value != nil {
+		req.Header.Set("Content-Type", "application/json")
+	}
 	resp, err := http.DefaultClient.Do(req)
 	if err != nil {
 		return nil, 0, err

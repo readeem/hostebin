@@ -2,8 +2,6 @@ package cli
 
 import (
 	"context"
-	"crypto/rand"
-	"encoding/base64"
 	"errors"
 	"flag"
 	"fmt"
@@ -22,6 +20,8 @@ import (
 	"github.com/readeem/hostebin/internal/logging"
 	"github.com/readeem/hostebin/internal/server"
 	"github.com/readeem/hostebin/internal/store"
+	"github.com/readeem/hostebin/internal/users"
+	"github.com/readeem/hostebin/internal/users/filestore"
 )
 
 func runServe(args []string, stderr io.Writer) int {
@@ -52,13 +52,39 @@ func runServe(args []string, stderr io.Writer) int {
 		logger.Error().Err(err).Msg("initialize storage")
 		return exitNetwork
 	}
-	token, generated, err := loadOrCreateToken(st.DataDir(), cfg.Token)
+	bootstrapToken, err := loadBootstrapToken(st.DataDir(), cfg.Token)
 	if err != nil {
 		logger.Error().Err(err).Msg("initialize token")
 		return exitNetwork
 	}
-	if generated {
-		logger.Info().Str("token", token).Str("path", filepath.Join(st.DataDir(), "token")).Msg("generated upload token")
+	userStore, err := filestore.Open(st.DataDir())
+	if err != nil {
+		logger.Error().Err(err).Msg("initialize users")
+		return exitNetwork
+	}
+	defer userStore.Close()
+	userService := users.NewService(userStore)
+	// Bootstrap mints the admin token itself when there is nothing to adopt, so
+	// generation lives in exactly one place; here we only persist and announce it.
+	adminID, generatedToken, err := userService.Bootstrap(context.Background(), bootstrapToken)
+	if err != nil {
+		logger.Error().Err(err).Msg("bootstrap admin user")
+		return exitNetwork
+	}
+	if generatedToken != "" {
+		if err := writeBootstrapToken(st.DataDir(), generatedToken); err != nil {
+			logger.Error().Err(err).Msg("persist generated token")
+			return exitNetwork
+		}
+		logger.Info().Str("token", generatedToken).Str("user", "admin").Str("path", filepath.Join(st.DataDir(), "token")).Msg("generated upload token")
+	}
+	adopted, err := st.AdoptUnownedBundles(adminID)
+	if err != nil {
+		logger.Error().Err(err).Msg("adopt legacy bundles")
+		return exitNetwork
+	}
+	if adopted > 0 {
+		logger.Info().Int("count", adopted).Str("user", "admin").Msg("adopted legacy bundles")
 	}
 	maxUpload, err := parseBytes(cfg.MaxUpload)
 	if err != nil {
@@ -84,7 +110,7 @@ func runServe(args []string, stderr io.Writer) int {
 	app, err := server.New(
 		server.Config{
 			Store:      st,
-			Token:      token,
+			Users:      userService,
 			MaxUpload:  maxUpload,
 			MaxFiles:   cfg.MaxFiles,
 			DefaultTTL: defaultTTL,
@@ -175,37 +201,37 @@ func httpListenAddr(host string, port int) (string, error) {
 	return net.JoinHostPort(host, strconv.Itoa(port)), nil
 }
 
-func loadOrCreateToken(dataDir, configuredToken string) (string, bool, error) {
+func loadBootstrapToken(dataDir, configuredToken string) (string, error) {
 	if configuredToken != "" {
-		return configuredToken, false, nil
+		return configuredToken, nil
 	}
 	path := filepath.Join(dataDir, "token")
 	if data, err := os.ReadFile(path); err == nil {
 		token := strings.TrimSpace(string(data))
 		if token == "" {
-			return "", false, errors.New("token file is empty")
+			return "", errors.New("token file is empty")
 		}
-		return token, false, nil
+		return token, nil
 	} else if !errors.Is(err, os.ErrNotExist) {
-		return "", false, err
+		return "", err
 	}
-	b := make([]byte, 32)
-	if _, err := rand.Read(b); err != nil {
-		return "", false, err
-	}
-	token := base64.RawURLEncoding.EncodeToString(b)
+	return "", nil
+}
+
+func writeBootstrapToken(dataDir, token string) error {
+	path := filepath.Join(dataDir, "token")
 	f, err := os.OpenFile(path, os.O_WRONLY|os.O_CREATE|os.O_EXCL, 0o600)
 	if err != nil {
-		return "", false, err
+		return err
 	}
 	if _, err := io.WriteString(f, token+"\n"); err != nil {
 		_ = f.Close()
-		return "", false, err
+		return err
 	}
 	if err := f.Close(); err != nil {
-		return "", false, err
+		return err
 	}
-	return token, true, nil
+	return nil
 }
 
 func parseBytes(raw string) (int64, error) {

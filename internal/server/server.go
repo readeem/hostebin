@@ -2,7 +2,6 @@ package server
 
 import (
 	"context"
-	"crypto/subtle"
 	"encoding/json"
 	"errors"
 	"fmt"
@@ -14,6 +13,7 @@ import (
 
 	"github.com/readeem/hostebin/internal/logging"
 	"github.com/readeem/hostebin/internal/store"
+	"github.com/readeem/hostebin/internal/users"
 	"github.com/rs/zerolog"
 )
 
@@ -21,7 +21,7 @@ const DefaultCSP = "default-src 'self' data: blob: https: 'unsafe-inline' 'unsaf
 
 type Config struct {
 	Store      *store.Store
-	Token      string
+	Users      *users.Service
 	MaxUpload  int64
 	MaxFiles   int
 	DefaultTTL time.Duration
@@ -39,8 +39,8 @@ func New(cfg Config) (*Server, error) {
 	if cfg.Store == nil {
 		return nil, errors.New("store is required")
 	}
-	if cfg.Token == "" {
-		return nil, errors.New("upload token is required")
+	if cfg.Users == nil {
+		return nil, errors.New("users service is required")
 	}
 	if cfg.MaxUpload <= 0 {
 		cfg.MaxUpload = 32 << 20
@@ -68,6 +68,13 @@ func New(cfg Config) (*Server, error) {
 	mux.HandleFunc("GET /api/v1/bundles", s.auth(s.listBundles))
 	mux.HandleFunc("PUT /api/v1/bundles/{id}", s.auth(s.updateBundle))
 	mux.HandleFunc("DELETE /api/v1/bundles/{id}", s.auth(s.deleteBundle))
+	mux.HandleFunc("GET /api/v1/whoami", s.auth(s.whoami))
+	mux.HandleFunc("GET /api/v1/users", s.admin(s.listUsers))
+	mux.HandleFunc("POST /api/v1/users", s.admin(s.createUser))
+	mux.HandleFunc("PATCH /api/v1/users/{id}", s.admin(s.patchUser))
+	mux.HandleFunc("DELETE /api/v1/users/{id}", s.admin(s.deleteUser))
+	mux.HandleFunc("PUT /api/v1/users/{id}/token", s.auth(s.rotateToken))
+	mux.HandleFunc("DELETE /api/v1/users/{id}/token", s.auth(s.revokeToken))
 	mux.HandleFunc("GET /b/{id}/{path...}", s.serveBundle)
 	s.handler = http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		w.Header().Set("X-Content-Type-Options", "nosniff")
@@ -115,16 +122,36 @@ func baseURL(r *http.Request) string {
 	return scheme + "://" + r.Host
 }
 
-func (s *Server) auth(next http.HandlerFunc) http.HandlerFunc {
+type principalHandler func(http.ResponseWriter, *http.Request, users.Principal)
+
+func (s *Server) auth(next principalHandler) http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
-		provided := strings.TrimPrefix(r.Header.Get("Authorization"), "Bearer ")
-		if len(provided) != len(s.cfg.Token) || subtle.ConstantTimeCompare([]byte(provided), []byte(s.cfg.Token)) != 1 {
+		header := r.Header.Get("Authorization")
+		provided, ok := strings.CutPrefix(header, "Bearer ")
+		if !ok || provided == "" {
 			w.Header().Set("WWW-Authenticate", "Bearer")
 			writeError(w, http.StatusUnauthorized, "valid bearer token required")
 			return
 		}
-		next(w, r)
+		principal, err := s.cfg.Users.Authenticate(r.Context(), provided)
+		if err != nil {
+			s.cfg.Logger.Warn().Str("action", "authenticate").Err(err).Msg("authentication failed")
+			w.Header().Set("WWW-Authenticate", "Bearer")
+			writeError(w, http.StatusUnauthorized, "valid bearer token required")
+			return
+		}
+		next(w, r, principal)
 	}
+}
+
+func (s *Server) admin(next principalHandler) http.HandlerFunc {
+	return s.auth(func(w http.ResponseWriter, r *http.Request, principal users.Principal) {
+		if !principal.IsAdmin() {
+			writeError(w, http.StatusForbidden, "admin access required")
+			return
+		}
+		next(w, r, principal)
+	})
 }
 
 func writeJSON(w http.ResponseWriter, status int, v any) {
