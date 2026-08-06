@@ -153,6 +153,9 @@ hostebin up --id 9f2a1c7d40b8e35f report.html
 hostebin up [flags] <file|directory|->...   upload a bundle, print its URL
 hostebin ls [flags]                         list live bundles
 hostebin rm [flags] <id>                    delete a bundle
+hostebin user ls|add|rm|disable|enable      manage users
+hostebin token new|rm                       rotate or revoke a token
+hostebin whoami [--json]                    show the current identity
 hostebin serve [flags]                      run the server
 hostebin version                            version, commit, build date
 ```
@@ -175,6 +178,34 @@ Directory uploads strip the directory argument itself and keep the paths below i
 symlinks and non-regular files are refused. `--entry` picks the root page; otherwise
 a single file wins, then `index.html`, then the first HTML file, then the first
 Markdown file, then a generated listing.
+
+## Users and access tokens
+
+The token created on first start belongs to the `admin` user. Admins can create and
+delete users, disable or enable accounts, and manage anyone's token. Regular users
+can rotate and revoke only their own token.
+`token new` replaces the current one, which stops working immediately.
+The new plaintext is printed exactly once:
+
+```sh
+hostebin user add bob --ttl 90d       # stdout is Bob's token
+hostebin token new --user bob         # rotates Bob's token; stdout is the replacement
+hostebin user ls                       # includes token metadata
+hostebin user disable bob
+hostebin token rm --user bob           # revokes Bob's token
+```
+
+Bundle listing, replacement, and deletion are isolated by owner. A non-owner receives
+the same `404` as for an unknown bundle. Admins are the exception: they can replace or
+delete any bundle, so abusive content can be removed without deleting its owner. Admin
+listing stays scoped by default — `hostebin ls` shows an admin their own bundles, and
+`hostebin ls --all` adds every other owner's. Regular users get their own view even if
+they pass `--all`.
+
+Reads stay public and unauthenticated. The 128-bit bundle ID is still the read
+capability. Isolation is an API-surface property: it stops Bob listing, editing, or
+deleting Alice's bundles. It does not stop him reading one whose URL he has, and it
+does not change the existing shared-origin caveat.
 
 ## Configuration
 
@@ -212,7 +243,7 @@ names:
 }
 ```
 
-Persistent data (bundles plus the `token` file) lives in
+Persistent data (bundles, `users.json`, plus the legacy bootstrap `token` file) lives in
 `${XDG_DATA_HOME:-~/.local/share}/hostebin` on Linux/BSD and `<user config
 dir>/hostebin/data` elsewhere.
 
@@ -287,8 +318,18 @@ curl -sf -H "Authorization: Bearer $HOSTEBIN_TOKEN" \
 | `PUT /api/v1/bundles/{id}?mode=replace` | Atomically replace a bundle |
 | `PUT /api/v1/bundles/{id}?mode=merge` | Atomically merge named files into a bundle |
 | `GET /api/v1/bundles` | List live bundles |
+| `GET /api/v1/bundles?all=1` | Admin global view with owners |
 | `DELETE /api/v1/bundles/{id}` | Delete a bundle |
+| `GET /api/v1/whoami` | Show the authenticated user and token label |
+| `GET, POST /api/v1/users` | List or create users (admin) |
+| `PATCH, DELETE /api/v1/users/{id}` | Disable/enable or delete a user (admin) |
+| `PUT /api/v1/users/{id}/token` | Atomically replace the user's token (admin or self) |
+| `DELETE /api/v1/users/{id}/token` | Revoke the user's token (admin or self) |
 | `GET /b/{id}/...` | Read public content; `?raw=1` disables Markdown rendering |
+
+`PUT /api/v1/users/{id}/token` returns the replacement plaintext once. The previous
+token is invalid for the next request. Its `{label, ttl}` body is optional; sending no
+body accepts the defaults.
 
 Raw uploads also accept `X-Hostebin-Title`, `X-Hostebin-Entry`, and `X-Hostebin-TTL`;
 multipart uploads use `title`, `entry`, and `ttl` fields.
