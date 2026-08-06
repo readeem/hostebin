@@ -27,6 +27,12 @@ func Run(args []string, stdin io.Reader, stdout, stderr io.Writer) int {
 		return runLS(args[1:], stdout, stderr)
 	case "rm":
 		return runRM(args[1:], stdout, stderr)
+	case "user":
+		return runUser(args[1:], stdout, stderr)
+	case "token":
+		return runToken(args[1:], stdout, stderr)
+	case "whoami":
+		return runWhoami(args[1:], stdout, stderr)
 	case "version", "--version", "-version":
 		fmt.Fprintln(stdout, version.String())
 		return exitOK
@@ -47,11 +53,14 @@ Commands:
   up [flags] <file|dir|->...  upload a bundle and print its URL
   ls [flags]                  list live bundles
   rm [flags] <id>             delete a bundle
+  user <command> [flags]      manage users
+  token new|rm [flags]        rotate or revoke a token
+  whoami [--json]             show the authenticated identity
   serve [flags]               run the server
   version                     print version information
   help                        print this message
 
-Client flags (up, ls, rm):
+Client flags:
   --server URL     server base URL      (HOSTEBIN_SERVER)
   --token TOKEN    bearer token         (HOSTEBIN_TOKEN)
   --config PATH    config file          (HOSTEBIN_CONFIG)

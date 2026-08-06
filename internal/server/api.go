@@ -13,6 +13,7 @@ import (
 	"time"
 
 	"github.com/readeem/hostebin/internal/store"
+	"github.com/readeem/hostebin/internal/users"
 )
 
 type uploadResponse struct {
@@ -29,12 +30,17 @@ type responseFile struct {
 	URL  string `json:"url"`
 }
 
+type bundleListResponse struct {
+	store.BundleMeta
+	Owner string `json:"owner,omitempty"`
+}
+
 type parsedUpload struct {
 	files             []store.File
 	title, entry, ttl string
 }
 
-func (s *Server) createBundle(w http.ResponseWriter, r *http.Request) {
+func (s *Server) createBundle(w http.ResponseWriter, r *http.Request, principal users.Principal) {
 	upload, ok := s.parseUpload(w, r)
 	if !ok {
 		return
@@ -43,6 +49,7 @@ func (s *Server) createBundle(w http.ResponseWriter, r *http.Request) {
 	if !ok {
 		return
 	}
+	opts.OwnerID = principal.UserID
 	meta, err := s.cfg.Store.Create(opts, upload.files)
 	if err != nil {
 		writeError(w, http.StatusBadRequest, err.Error())
@@ -50,6 +57,7 @@ func (s *Server) createBundle(w http.ResponseWriter, r *http.Request) {
 	}
 	s.cfg.Logger.Info().
 		Str("action", "create").
+		Str("user", principal.Name).
 		Str("bundle_id", meta.ID).
 		Int("file_count", len(meta.Files)).
 		Int64("byte_count", meta.Bytes).
@@ -57,7 +65,7 @@ func (s *Server) createBundle(w http.ResponseWriter, r *http.Request) {
 	writeJSON(w, http.StatusCreated, s.makeUploadResponse(r, meta))
 }
 
-func (s *Server) updateBundle(w http.ResponseWriter, r *http.Request) {
+func (s *Server) updateBundle(w http.ResponseWriter, r *http.Request, principal users.Principal) {
 	mode := r.URL.Query().Get("mode")
 	if mode == "" {
 		mode = "replace"
@@ -74,7 +82,7 @@ func (s *Server) updateBundle(w http.ResponseWriter, r *http.Request) {
 	if !ok {
 		return
 	}
-	meta, err := s.cfg.Store.Update(r.PathValue("id"), opts, upload.files, mode)
+	meta, err := s.cfg.Store.Update(r.PathValue("id"), bundleScope(principal), opts, upload.files, mode)
 	if err != nil {
 		status := http.StatusBadRequest
 		if errors.Is(err, store.ErrNotFound) || errors.Is(err, store.ErrExpired) {
@@ -85,6 +93,7 @@ func (s *Server) updateBundle(w http.ResponseWriter, r *http.Request) {
 	}
 	s.cfg.Logger.Info().
 		Str("action", "update").
+		Str("user", principal.Name).
 		Str("bundle_id", meta.ID).
 		Str("mode", mode).
 		Int("file_count", len(meta.Files)).
@@ -238,28 +247,68 @@ func (s *Server) makeUploadResponse(r *http.Request, meta *store.BundleMeta) upl
 	return resp
 }
 
-func (s *Server) listBundles(w http.ResponseWriter, r *http.Request) {
-	metas, err := s.cfg.Store.List()
+// bundleScope is the set of bundles a principal may act on. Admins reach every
+// bundle so they can moderate content without deleting its owner; everyone else
+// is confined to their own, and a non-owner sees ErrNotFound rather than a 403
+// that would confirm the bundle exists.
+func bundleScope(p users.Principal) store.Scope {
+	if p.IsAdmin() {
+		return store.Everything()
+	}
+	return store.OwnedBy(p.UserID)
+}
+
+func (s *Server) listBundles(w http.ResponseWriter, r *http.Request, principal users.Principal) {
+	// Listing is the one place admins do not get the global view by default:
+	// an unqualified `ls` should stay their own working set.
+	all := principal.IsAdmin() && r.URL.Query().Get("all") == "1"
+	scope := store.OwnedBy(principal.UserID)
+	if all {
+		scope = store.Everything()
+	}
+	metas, err := s.cfg.Store.List(scope)
 	if err != nil {
 		writeError(w, http.StatusInternalServerError, err.Error())
 		return
 	}
 	s.cfg.Logger.Info().
 		Str("action", "read").
+		Str("user", principal.Name).
 		Int("bundle_count", len(metas)).
 		Msg("bundles listed")
-	writeJSON(w, http.StatusOK, metas)
+	if !all {
+		for i := range metas {
+			metas[i].OwnerID = ""
+		}
+		writeJSON(w, http.StatusOK, metas)
+		return
+	}
+	allUsers, err := s.cfg.Users.ListUsers(r.Context())
+	if err != nil {
+		writeError(w, http.StatusInternalServerError, err.Error())
+		return
+	}
+	names := make(map[string]string, len(allUsers))
+	for _, user := range allUsers {
+		names[user.ID] = user.Name
+	}
+	response := make([]bundleListResponse, 0, len(metas))
+	for _, meta := range metas {
+		response = append(response, bundleListResponse{BundleMeta: meta, Owner: names[meta.OwnerID]})
+	}
+	writeJSON(w, http.StatusOK, response)
 }
 
-func (s *Server) deleteBundle(w http.ResponseWriter, r *http.Request) {
+func (s *Server) deleteBundle(w http.ResponseWriter, r *http.Request, principal users.Principal) {
 	id := r.PathValue("id")
-	err := s.cfg.Store.Delete(id)
+	err := s.cfg.Store.Delete(id, bundleScope(principal))
 	if err != nil {
 		writeError(w, statusForStoreError(err), err.Error())
 		return
 	}
 	s.cfg.Logger.Info().
 		Str("action", "delete").
+		Str("user", principal.Name).
 		Str("bundle_id", id).
 		Msg("bundle deleted")
 	w.WriteHeader(http.StatusNoContent)

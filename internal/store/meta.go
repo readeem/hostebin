@@ -5,6 +5,7 @@ import "time"
 // BundleMeta is the durable description of an uploaded bundle.
 type BundleMeta struct {
 	ID        string     `json:"id"`
+	OwnerID   string     `json:"owner_id,omitempty"`
 	CreatedAt time.Time  `json:"created_at"`
 	ExpiresAt *time.Time `json:"expires_at"`
 	Title     string     `json:"title,omitempty"`
@@ -12,6 +13,10 @@ type BundleMeta struct {
 	Bytes     int64      `json:"bytes"`
 	Uploader  string     `json:"uploader,omitempty"`
 	Files     []FileMeta `json:"files"`
+}
+
+func (m *BundleMeta) expired() bool {
+	return m.ExpiresAt != nil && !time.Now().Before(*m.ExpiresAt)
 }
 
 type FileMeta struct {
@@ -22,6 +27,7 @@ type FileMeta struct {
 }
 
 type Options struct {
+	OwnerID    string
 	Title      string
 	Entry      string
 	EntrySet   bool
