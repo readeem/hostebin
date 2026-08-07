@@ -13,6 +13,7 @@ import (
 	"sync"
 	"time"
 
+	"github.com/readeem/hostebin/internal/fsutil"
 	"github.com/readeem/hostebin/internal/users"
 )
 
@@ -185,16 +186,7 @@ func (s *Store) write(data diskFile) error {
 		_ = os.Remove(tmp)
 		return err
 	}
-	d, err := os.Open(s.dir)
-	if err != nil {
-		return err
-	}
-	err = d.Sync()
-	closeErr = d.Close()
-	if err != nil {
-		return err
-	}
-	return closeErr
+	return fsutil.SyncDir(s.dir)
 }
 
 func checkContext(ctx context.Context) error {
