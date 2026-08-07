@@ -5,6 +5,7 @@ import (
 	"errors"
 	"os"
 	"path/filepath"
+	"runtime"
 	"strings"
 	"testing"
 	"time"
@@ -41,7 +42,7 @@ func TestBootstrapPersistenceAndRevocation(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	if info.Mode().Perm() != 0o600 {
+	if runtime.GOOS != "windows" && info.Mode().Perm() != 0o600 {
 		t.Fatalf("users.json mode = %v", info.Mode().Perm())
 	}
 	principal, err := service.Authenticate(context.Background(), generated)

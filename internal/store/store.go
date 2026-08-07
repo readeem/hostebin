@@ -14,6 +14,8 @@ import (
 	"slices"
 	"strings"
 	"time"
+
+	"github.com/readeem/hostebin/internal/fsutil"
 )
 
 var (
@@ -454,16 +456,7 @@ func (s *Store) writeMeta(meta *BundleMeta) error {
 		_ = os.Remove(tmp)
 		return err
 	}
-	d, err := os.Open(dir)
-	if err != nil {
-		return err
-	}
-	err = d.Sync()
-	closeErr = d.Close()
-	if err != nil {
-		return err
-	}
-	return closeErr
+	return fsutil.SyncDir(dir)
 }
 
 // ownedBy collects every bundle belonging to ownerID. Unlike List it includes
