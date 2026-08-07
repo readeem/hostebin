@@ -22,6 +22,7 @@ import (
 	"github.com/readeem/hostebin/internal/logging"
 	"github.com/readeem/hostebin/internal/server"
 	"github.com/readeem/hostebin/internal/store"
+	"github.com/rs/zerolog"
 )
 
 func runServe(args []string, stderr io.Writer) int {
@@ -134,7 +135,7 @@ func runServe(args []string, stderr io.Writer) int {
 	errCh := make(chan error, len(listeners.Endpoints))
 	servers := make([]*http.Server, 0, len(listeners.Endpoints))
 
-	for _, endpoint := range listeners.Endpoints {
+	for i, endpoint := range listeners.Endpoints {
 		handler := endpoint.Handler
 		if handler == nil {
 			handler = app.Handler()
@@ -144,7 +145,7 @@ func runServe(args []string, stderr io.Writer) int {
 		}
 		httpServer := &http.Server{Handler: handler, ReadHeaderTimeout: 10 * time.Second}
 		servers = append(servers, httpServer)
-		logger.Info().Str("address", endpoint.Listener.Addr().String()).Msg("listening")
+		logListening(logger, endpoint, cfg, st.DataDir(), maxUpload, defaultTTL, csp, i == 0)
 
 		go func(ln net.Listener) { errCh <- httpServer.Serve(ln) }(endpoint.Listener)
 	}
@@ -163,6 +164,44 @@ func runServe(args []string, stderr io.Writer) int {
 		}
 		return exitOK
 	}
+}
+
+func logListening(logger *zerolog.Logger, endpoint listen.Endpoint, cfg *Config, dataDir string, maxUpload int64, defaultTTL time.Duration, csp string, includeConfig bool) {
+	event := logger.Info().Str("address", endpoint.Listener.Addr().String())
+	if endpoint.BaseURL != "" {
+		event = event.Str("bundle_base_url", endpoint.BaseURL)
+	}
+	if !includeConfig {
+		event.Msg("listening")
+		return
+	}
+	ttl := "never"
+	if defaultTTL > 0 {
+		ttl = defaultTTL.String()
+	}
+	cspMode := "custom"
+	if strings.EqualFold(csp, "off") {
+		cspMode = "disabled"
+	} else if cfg.CSP == "" {
+		cspMode = "default"
+	}
+	event = event.Int64("max_upload_bytes", maxUpload).
+		Int("max_files", cfg.MaxFiles).
+		Str("default_ttl", ttl).
+		Str("csp", cspMode).
+		Bool("certificate_tls", cfg.TLSCert != "").
+		Bool("tailscale", cfg.Tailscale || cfg.Funnel).
+		Bool("funnel", cfg.Funnel)
+	if cfg.ConfigFile != "" {
+		event = event.Str("config_file", cfg.ConfigFile)
+	}
+	if dataDir != "" {
+		event = event.Str("data_dir", dataDir)
+	}
+	if cfg.ACMEDomain != "" {
+		event = event.Str("acme_domain", cfg.ACMEDomain)
+	}
+	event.Msg("listening")
 }
 
 func httpListenAddr(host string, port int) (string, error) {
