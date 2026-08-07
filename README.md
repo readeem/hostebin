@@ -276,27 +276,124 @@ Useful server settings: `--max-upload` (default `32MiB`), `--max-files` (default
 `--default-ttl` (default `never`), `--csp` (`off` disables it). Expired bundles 404
 immediately; a sweep at startup and every ten minutes reclaims their files.
 
-### Per-bundle origins
+### Path-based or host-based routing
 
-`--bundle-host '*.paste.example.com'` serves each bundle from its own subdomain —
-`<id>.paste.example.com` — instead of `/b/<id>/`. Every bundle then gets a distinct
-browser origin, so one cannot read another's `localStorage` or fetch its files, and
-the API is cross-origin to all of them. Existing `/b/<id>/…` links 301 to the new
-origin, and upload responses return the subdomain form, so no client changes.
+A bundle can be reached in one of two shapes, chosen once per server:
 
-Requires a **wildcard certificate**, which the built-in ACME support cannot issue:
-`autocert` implements only `http-01` and `tls-alpn-01`, while Let's Encrypt issues
-wildcards only over `dns-01`. Combining `--bundle-host` with `--acme-domain` is a
-startup error rather than a silent fallback — per-host issuance would publish every
-bundle id to the public Certificate Transparency logs, defeating the point of an
-unguessable link. Terminate TLS at a reverse proxy holding `*.paste.example.com`
-(forwarding the original `Host` and `X-Forwarded-Proto`), or pass the certificate
-with `--tls-cert`/`--tls-key`.
+| | Path-based (default) | Host-based (`--bundle-host`) |
+| --- | --- | --- |
+| URL | `https://paste.example.com/b/<id>/` | `https://<id>.paste.example.com/` |
+| Configuration | nothing — this is the default | `--bundle-host '*.paste.example.com'` |
+| DNS | one A/AAAA record | wildcard record for `*.paste.example.com` |
+| TLS | anything, including built-in ACME | a **wildcard certificate** you supply |
+| Browser origin | all bundles share one, with the API | one per bundle, none shared with the API |
+| Where the id is exposed | URL path only | also DNS queries and TLS SNI |
 
-Note that the id moves from the URL path into the hostname, so it becomes visible
-to DNS resolvers and to anyone on the network path via TLS SNI. Bundle responses
-send `Referrer-Policy: no-referrer` so the id is not handed to third-party origins
-the page loads from.
+**Use path-based routing** — the default — for localhost, a tailnet, a single-user
+VPS, or anywhere you cannot get a wildcard certificate. It is the only mode the
+built-in listeners can serve on their own: `--acme-domain` refuses to start
+alongside `--bundle-host`, and Tailscale issues certificates per node, not per
+wildcard, so `--tailscale` and `--funnel` are effectively path-based too.
+
+**Use host-based routing** when bundles come from more than one person, or from
+agents whose output you do not fully control, and you want the browser to enforce
+the separation. Under path-based routing every bundle shares an origin, so a page in
+one bundle can read another bundle's `localStorage` or `fetch` its files if it knows
+that bundle's id, and it shares an origin with `/api/v1/*`. A distinct origin per
+bundle removes that class of problem entirely.
+
+#### Switching to host-based routing
+
+```sh
+hostebin serve --port 0 --tls-addr :8443 \
+  --tls-cert wildcard.pem --tls-key wildcard-key.pem \
+  --bundle-host '*.paste.example.com'
+```
+
+1. Point a wildcard DNS record at the server.
+2. Obtain a certificate for `*.paste.example.com`. Terminate TLS at a reverse proxy
+   holding it (forwarding the original `Host` and `X-Forwarded-Proto`), or pass it to
+   `--tls-cert`/`--tls-key`.
+3. Start with `--bundle-host '*.paste.example.com'`. The value must begin with `*.`
+   and the wildcard matches a single label; a bare hostname is rejected at startup.
+
+Nothing changes on the client side: upload responses return the subdomain form, and
+existing `/b/<id>/…` links 301 to it, so links you shared before the switch keep
+working. `--base-url` still controls the scheme and port used to build bundle URLs.
+
+Built-in ACME cannot issue the certificate: `autocert` implements only `http-01` and
+`tls-alpn-01`, while Let's Encrypt issues wildcards only over `dns-01`. Combining
+`--bundle-host` with `--acme-domain` is a startup error rather than a silent
+fallback — per-host issuance would publish every bundle id to the public Certificate
+Transparency logs, defeating the point of an unguessable link.
+
+The trade-off for the origin separation is that the id moves from the URL path into
+the hostname, so it becomes visible to DNS resolvers and to anyone on the network
+path via TLS SNI. Bundle responses send `Referrer-Policy: no-referrer` under both
+modes, so the id is not handed to third-party origins the page loads from.
+
+#### Dokploy + Cloudflare
+
+Deploy `ghcr.io/readeem/hostebin` as a Dokploy application or Compose service, with
+a volume on `/data`.
+
+**Path-based** needs nothing special: under *Domains*, add `hostebin.example.com`
+on container port `8080` with HTTPS and the Let's Encrypt certificate provider.
+
+**Host-based** takes three more steps, because Dokploy has no wildcard-domain field
+and Let's Encrypt only issues wildcards over `dns-01`:
+
+1. **Cert resolver.** In `/dashboard/traefik`, add a DNS-challenge resolver to the
+   global static config, and set `CF_DNS_API_TOKEN` in Traefik's environment to a
+   Cloudflare token with *Zone → Zone → Read* and *Zone → DNS → Edit*:
+
+   ```yaml
+   certificatesResolvers:
+     cloudflare:
+       acme:
+         email: ops@example.com
+         storage: /etc/dokploy/traefik/dynamic/acme.json
+         dnsChallenge:
+           provider: cloudflare
+   ```
+
+2. **Router rule.** Add the domain first — Dokploy generates the routing from it, and
+   for an application the Traefik config editor only appears at the bottom of
+   *Advanced* once one exists. Then widen the rule on both routers and request the
+   wildcard on the `websecure` one:
+
+   ```yaml
+   rule: Host(`hostebin.example.com`) || HostRegexp(`^[a-z0-9-]+\.hostebin\.example\.com$`)
+   tls:
+     certResolver: cloudflare
+     domains:
+       - main: hostebin.example.com
+         sans:
+           - "*.hostebin.example.com"
+   ```
+
+   For a Compose service the routing lives in the generated Traefik labels instead,
+   so edit those on the service — same rule, same resolver:
+
+   ```yaml
+   labels:
+     - "traefik.http.routers.hostebin-websecure.rule=Host(`hostebin.example.com`) || HostRegexp(`^[a-z0-9-]+\\.hostebin\\.example\\.com$`)"
+     - "traefik.http.routers.hostebin-websecure.tls.certresolver=cloudflare"
+     - "traefik.http.routers.hostebin-websecure.tls.domains[0].main=hostebin.example.com"
+     - "traefik.http.routers.hostebin-websecure.tls.domains[0].sans=*.hostebin.example.com"
+   ```
+
+   Either way Traefik forwards the original `Host` and sets `X-Forwarded-Proto`, which
+   is what `--bundle-host` needs to build correct URLs.
+
+3. **DNS.** Add an A record for `*.hostebin.example.com` pointing at the server as
+   **DNS-only (grey cloud)**. Cloudflare's Universal SSL covers only the apex and
+   first-level subdomains, so a proxied `*.hostebin.example.com` fails TLS unless you
+   pay for Advanced Certificate Manager. Your `hostebin.example.com` (or
+   `*.example.com`) records can stay proxied.
+
+Finally, set `HOSTEBIN_BUNDLE_HOST=*.hostebin.example.com` in the service's
+environment. All deployments need a redeploy/reload for domain and env changes to take effect.
 
 The `.deb`, `.rpm`, and Arch packages install a hardened systemd unit:
 
@@ -380,7 +477,8 @@ whoever holds the upload token is trusted, and the reader and their network are 
 
 By default bundles share an origin, so content can reach another bundle whose
 unguessable ID it knows. `--bundle-host` gives each bundle its own origin and removes
-that class entirely; see [Per-bundle origins](#per-bundle-origins).
+that class entirely; see
+[Path-based or host-based routing](#path-based-or-host-based-routing).
 
 **While bundles share an origin with the API, the API must never accept ambient
 credentials.** It is bearer-token only for exactly this reason: a cookie session would
