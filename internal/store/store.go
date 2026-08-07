@@ -26,6 +26,20 @@ type Store struct {
 	bundlesDir string
 }
 
+// Scope makes ownership an explicit input to every metadata or mutation API.
+// An empty OwnerID never matches; All must be requested deliberately.
+type Scope struct {
+	OwnerID string
+	All     bool
+}
+
+func OwnedBy(ownerID string) Scope { return Scope{OwnerID: ownerID} }
+func Everything() Scope            { return Scope{All: true} }
+
+func (sc Scope) owns(meta *BundleMeta) bool {
+	return sc.All || (sc.OwnerID != "" && meta.OwnerID == sc.OwnerID)
+}
+
 func New(dataDir string) (*Store, error) {
 	if dataDir == "" {
 		return nil, errors.New("data directory is required")
@@ -60,6 +74,9 @@ func ValidateName(name string) (string, error) {
 }
 
 func (s *Store) Create(opts Options, files []File) (*BundleMeta, error) {
+	if opts.OwnerID == "" {
+		return nil, errors.New("bundle owner is required")
+	}
 	for range 5 {
 		id, err := NewID()
 		if err != nil {
@@ -72,9 +89,9 @@ func (s *Store) Create(opts Options, files []File) (*BundleMeta, error) {
 	return nil, errors.New("could not allocate a unique bundle id")
 }
 
-func (s *Store) Update(id string, opts Options, files []File, mode string) (*BundleMeta, error) {
-	if !validID(id) {
-		return nil, ErrNotFound
+func (s *Store) Update(id string, sc Scope, opts Options, files []File, mode string) (*BundleMeta, error) {
+	if err := s.authorize(id, sc); err != nil {
+		return nil, err
 	}
 	if mode != "merge" && mode != "replace" {
 		return nil, errors.New("update mode must be merge or replace")
@@ -126,8 +143,10 @@ func (s *Store) write(id string, opts Options, files []File, updating bool, mode
 	if err := os.Mkdir(filepath.Join(tmp, "files"), 0o700); err != nil {
 		return nil, err
 	}
-	meta := &BundleMeta{ID: id, CreatedAt: time.Now().UTC(), ExpiresAt: opts.ExpiresAt, Title: opts.Title, Entry: opts.Entry, Uploader: opts.Uploader}
+	meta := &BundleMeta{ID: id, OwnerID: opts.OwnerID, CreatedAt: time.Now().UTC(), ExpiresAt: opts.ExpiresAt, Title: opts.Title, Entry: opts.Entry, Uploader: opts.Uploader}
 	if old != nil {
+		// Ownership can never be reassigned through an upload request.
+		meta.OwnerID = old.OwnerID
 		meta.CreatedAt = old.CreatedAt
 		if opts.Title == "" {
 			meta.Title = old.Title
@@ -261,6 +280,17 @@ func hasFile(files []FileMeta, name string) bool {
 }
 
 func (s *Store) Get(id string) (*BundleMeta, error) {
+	meta, err := s.readMeta(id)
+	if err != nil {
+		return nil, err
+	}
+	if meta.expired() {
+		return nil, ErrExpired
+	}
+	return meta, nil
+}
+
+func (s *Store) readMeta(id string) (*BundleMeta, error) {
 	if !validID(id) {
 		return nil, ErrNotFound
 	}
@@ -275,30 +305,58 @@ func (s *Store) Get(id string) (*BundleMeta, error) {
 	if err := json.Unmarshal(b, &meta); err != nil {
 		return nil, fmt.Errorf("decode bundle metadata: %w", err)
 	}
-	if meta.ExpiresAt != nil && !time.Now().Before(*meta.ExpiresAt) {
-		return nil, ErrExpired
-	}
 	return &meta, nil
 }
 
-func (s *Store) List() ([]BundleMeta, error) {
+// authorize reports whether sc may act on the bundle. Expiry is deliberately
+// not consulted: an expired bundle is still owned by somebody, and the callers
+// that must reject expired content (Get, List) check that themselves.
+func (s *Store) authorize(id string, sc Scope) error {
+	meta, err := s.readMeta(id)
+	if err != nil {
+		return err
+	}
+	if !sc.owns(meta) {
+		return ErrNotFound
+	}
+	return nil
+}
+
+// walk visits the stored metadata of every bundle, expired ones included.
+func (s *Store) walk(visit func(*BundleMeta) error) error {
 	entries, err := os.ReadDir(s.bundlesDir)
 	if err != nil {
-		return nil, err
+		return err
 	}
-	var out []BundleMeta
 	for _, entry := range entries {
 		if !entry.IsDir() || strings.HasPrefix(entry.Name(), ".") {
 			continue
 		}
-		meta, err := s.Get(entry.Name())
-		if errors.Is(err, ErrExpired) || errors.Is(err, ErrNotFound) {
+		meta, err := s.readMeta(entry.Name())
+		if errors.Is(err, ErrNotFound) {
 			continue
 		}
 		if err != nil {
-			return nil, err
+			return err
+		}
+		if err := visit(meta); err != nil {
+			return err
+		}
+	}
+	return nil
+}
+
+func (s *Store) List(sc Scope) ([]BundleMeta, error) {
+	var out []BundleMeta
+	err := s.walk(func(meta *BundleMeta) error {
+		if meta.expired() || !sc.owns(meta) {
+			return nil
 		}
 		out = append(out, *meta)
+		return nil
+	})
+	if err != nil {
+		return nil, err
 	}
 	slices.SortFunc(out, func(a, b BundleMeta) int { return b.CreatedAt.Compare(a.CreatedAt) })
 	return out, nil
@@ -324,10 +382,16 @@ func (s *Store) Open(id, name string) (*os.File, error) {
 	return f, err
 }
 
-func (s *Store) Delete(id string) error {
-	if !validID(id) {
-		return ErrNotFound
+func (s *Store) Delete(id string, sc Scope) error {
+	if err := s.authorize(id, sc); err != nil {
+		return err
 	}
+	return s.remove(id)
+}
+
+// remove discards a bundle directory. Callers are responsible for authorizing
+// the removal first.
+func (s *Store) remove(id string) error {
 	final := s.bundleDir(id)
 	if _, err := os.Stat(final); errors.Is(err, os.ErrNotExist) {
 		return ErrNotFound
@@ -339,6 +403,119 @@ func (s *Store) Delete(id string) error {
 		return err
 	}
 	return os.RemoveAll(trash)
+}
+
+// AdoptUnownedBundles assigns legacy metadata to the bootstrap admin. It is
+// idempotent and intentionally includes expired bundles so GC can handle them.
+func (s *Store) AdoptUnownedBundles(ownerID string) (int, error) {
+	if ownerID == "" {
+		return 0, errors.New("owner is required")
+	}
+	adopted := 0
+	err := s.walk(func(meta *BundleMeta) error {
+		if meta.OwnerID != "" {
+			return nil
+		}
+		meta.OwnerID = ownerID
+		if err := s.writeMeta(meta); err != nil {
+			return err
+		}
+		adopted++
+		return nil
+	})
+	return adopted, err
+}
+
+func (s *Store) writeMeta(meta *BundleMeta) error {
+	b, err := json.MarshalIndent(meta, "", "  ")
+	if err != nil {
+		return err
+	}
+	dir := s.bundleDir(meta.ID)
+	tmp := filepath.Join(dir, "meta.json.tmp")
+	f, err := os.OpenFile(tmp, os.O_WRONLY|os.O_CREATE|os.O_TRUNC, 0o600)
+	if err != nil {
+		return err
+	}
+	_, writeErr := f.Write(append(b, '\n'))
+	if writeErr == nil {
+		writeErr = f.Sync()
+	}
+	closeErr := f.Close()
+	if writeErr != nil {
+		_ = os.Remove(tmp)
+		return writeErr
+	}
+	if closeErr != nil {
+		_ = os.Remove(tmp)
+		return closeErr
+	}
+	if err := os.Rename(tmp, filepath.Join(dir, "meta.json")); err != nil {
+		_ = os.Remove(tmp)
+		return err
+	}
+	d, err := os.Open(dir)
+	if err != nil {
+		return err
+	}
+	err = d.Sync()
+	closeErr = d.Close()
+	if err != nil {
+		return err
+	}
+	return closeErr
+}
+
+// ownedBy collects every bundle belonging to ownerID. Unlike List it includes
+// expired bundles that the sweeper has not reached yet, so tearing down a user
+// never leaves metadata pointing at an account that no longer exists.
+func (s *Store) ownedBy(ownerID string) ([]BundleMeta, error) {
+	if ownerID == "" {
+		return nil, errors.New("owner is required")
+	}
+	var out []BundleMeta
+	err := s.walk(func(meta *BundleMeta) error {
+		if meta.OwnerID == ownerID {
+			out = append(out, *meta)
+		}
+		return nil
+	})
+	return out, err
+}
+
+func (s *Store) CountOwned(ownerID string) (int, error) {
+	metas, err := s.ownedBy(ownerID)
+	return len(metas), err
+}
+
+func (s *Store) DeleteOwned(ownerID string) (int, error) {
+	metas, err := s.ownedBy(ownerID)
+	if err != nil {
+		return 0, err
+	}
+	for i, meta := range metas {
+		if err := s.remove(meta.ID); err != nil {
+			return i, err
+		}
+	}
+	return len(metas), nil
+}
+
+func (s *Store) ReassignOwned(from, to string) (int, error) {
+	if to == "" {
+		return 0, errors.New("destination owner is required")
+	}
+	metas, err := s.ownedBy(from)
+	if err != nil {
+		return 0, err
+	}
+	for i := range metas {
+		metas[i].OwnerID = to
+		if err := s.writeMeta(&metas[i]); err != nil {
+			return i, err
+		}
+	}
+	return len(metas), nil
 }
 
 func (s *Store) bundleDir(id string) string { return filepath.Join(s.bundlesDir, id) }

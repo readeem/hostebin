@@ -24,8 +24,20 @@ These are known, documented properties rather than vulnerabilities:
   assets so generated reports render. Content in one bundle can therefore reach
   another bundle whose ID it already knows. Per-bundle origins are out of scope for
   v1 and tracked as a design limitation, not a bug.
-- **All mutations require the bearer token.** Anything that creates, replaces, or
-  deletes a bundle without a valid `Authorization: Bearer` header *is* a bug.
+- **Reads stay public and unauthenticated.** The 128-bit bundle ID is still the read
+  capability. User isolation stops one *regular* user listing, replacing, or deleting
+  another user's bundles; admins reach every bundle by design. Isolation does not make
+  bundle URLs private or change the shared-origin caveat above.
+- **All mutations require a live bearer token.** Each user has at most one token,
+  stored as a SHA-256 digest. Rotating it invalidates the previous token immediately,
+  and disabled users cannot authenticate. Anything that
+  creates, replaces, or deletes a bundle without a valid `Authorization: Bearer`
+  header *is* a bug.
+
+If a token leaks, revoke it immediately with `hostebin token rm`; an admin uses
+`hostebin token rm --user <name>`. Create a replacement with `hostebin token new`
+or `hostebin token new --user <name>`. Revocation is immediate:
+the next request using that token must receive `401`.
 
 Things worth reporting: escaping the storage root (`..`, symlinks, path
 normalization), bypassing the token check, resource exhaustion beyond the configured

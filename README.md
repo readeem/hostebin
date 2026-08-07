@@ -153,6 +153,9 @@ hostebin up --id 9f2a1c7d40b8e35f report.html
 hostebin up [flags] <file|directory|->...   upload a bundle, print its URL
 hostebin ls [flags]                         list live bundles
 hostebin rm [flags] <id>                    delete a bundle
+hostebin user ls|add|rm|disable|enable      manage users
+hostebin token new|rm                       rotate or revoke a token
+hostebin whoami [--json]                    show the current identity
 hostebin serve [flags]                      run the server
 hostebin version                            version, commit, build date
 ```
@@ -175,6 +178,34 @@ Directory uploads strip the directory argument itself and keep the paths below i
 symlinks and non-regular files are refused. `--entry` picks the root page; otherwise
 a single file wins, then `index.html`, then the first HTML file, then the first
 Markdown file, then a generated listing.
+
+## Users and access tokens
+
+The token created on first start belongs to the `admin` user. Admins can create and
+delete users, disable or enable accounts, and manage anyone's token. Regular users
+can rotate and revoke only their own token.
+`token new` replaces the current one, which stops working immediately.
+The new plaintext is printed exactly once:
+
+```sh
+hostebin user add bob --ttl 90d       # stdout is Bob's token
+hostebin token new --user bob         # rotates Bob's token; stdout is the replacement
+hostebin user ls                       # includes token metadata
+hostebin user disable bob
+hostebin token rm --user bob           # revokes Bob's token
+```
+
+Bundle listing, replacement, and deletion are isolated by owner. A non-owner receives
+the same `404` as for an unknown bundle. Admins are the exception: they can replace or
+delete any bundle, so abusive content can be removed without deleting its owner. Admin
+listing stays scoped by default — `hostebin ls` shows an admin their own bundles, and
+`hostebin ls --all` adds every other owner's. Regular users get their own view even if
+they pass `--all`.
+
+Reads stay public and unauthenticated. The 128-bit bundle ID is still the read
+capability. Isolation is an API-surface property: it stops Bob listing, editing, or
+deleting Alice's bundles. It does not stop him reading one whose URL he has, and it
+does not change the existing shared-origin caveat.
 
 ## Configuration
 
@@ -208,11 +239,12 @@ names:
   "max-upload": "32MiB",
   "max-files": 64,
   "default-ttl": "never",
-  "csp": ""
+  "csp": "",
+  "bundle-host": ""
 }
 ```
 
-Persistent data (bundles plus the `token` file) lives in
+Persistent data (bundles, `users.json`, plus the legacy bootstrap `token` file) lives in
 `${XDG_DATA_HOME:-~/.local/share}/hostebin` on Linux/BSD and `<user config
 dir>/hostebin/data` elsewhere.
 
@@ -243,6 +275,28 @@ a reverse proxy, forward the original `Host` and set `X-Forwarded-Proto`.
 Useful server settings: `--max-upload` (default `32MiB`), `--max-files` (default `64`),
 `--default-ttl` (default `never`), `--csp` (`off` disables it). Expired bundles 404
 immediately; a sweep at startup and every ten minutes reclaims their files.
+
+### Per-bundle origins
+
+`--bundle-host '*.paste.example.com'` serves each bundle from its own subdomain —
+`<id>.paste.example.com` — instead of `/b/<id>/`. Every bundle then gets a distinct
+browser origin, so one cannot read another's `localStorage` or fetch its files, and
+the API is cross-origin to all of them. Existing `/b/<id>/…` links 301 to the new
+origin, and upload responses return the subdomain form, so no client changes.
+
+Requires a **wildcard certificate**, which the built-in ACME support cannot issue:
+`autocert` implements only `http-01` and `tls-alpn-01`, while Let's Encrypt issues
+wildcards only over `dns-01`. Combining `--bundle-host` with `--acme-domain` is a
+startup error rather than a silent fallback — per-host issuance would publish every
+bundle id to the public Certificate Transparency logs, defeating the point of an
+unguessable link. Terminate TLS at a reverse proxy holding `*.paste.example.com`
+(forwarding the original `Host` and `X-Forwarded-Proto`), or pass the certificate
+with `--tls-cert`/`--tls-key`.
+
+Note that the id moves from the URL path into the hostname, so it becomes visible
+to DNS resolvers and to anyone on the network path via TLS SNI. Bundle responses
+send `Referrer-Policy: no-referrer` so the id is not handed to third-party origins
+the page loads from.
 
 The `.deb`, `.rpm`, and Arch packages install a hardened systemd unit:
 
@@ -287,8 +341,18 @@ curl -sf -H "Authorization: Bearer $HOSTEBIN_TOKEN" \
 | `PUT /api/v1/bundles/{id}?mode=replace` | Atomically replace a bundle |
 | `PUT /api/v1/bundles/{id}?mode=merge` | Atomically merge named files into a bundle |
 | `GET /api/v1/bundles` | List live bundles |
+| `GET /api/v1/bundles?all=1` | Admin global view with owners |
 | `DELETE /api/v1/bundles/{id}` | Delete a bundle |
+| `GET /api/v1/whoami` | Show the authenticated user and token label |
+| `GET, POST /api/v1/users` | List or create users (admin) |
+| `PATCH, DELETE /api/v1/users/{id}` | Disable/enable or delete a user (admin) |
+| `PUT /api/v1/users/{id}/token` | Atomically replace the user's token (admin or self) |
+| `DELETE /api/v1/users/{id}/token` | Revoke the user's token (admin or self) |
 | `GET /b/{id}/...` | Read public content; `?raw=1` disables Markdown rendering |
+
+`PUT /api/v1/users/{id}/token` returns the replacement plaintext once. The previous
+token is invalid for the next request. Its `{label, ttl}` body is optional; sending no
+body accepts the defaults.
 
 Raw uploads also accept `X-Hostebin-Title`, `X-Hostebin-Entry`, and `X-Hostebin-TTL`;
 multipart uploads use `title`, `entry`, and `ttl` fields.
@@ -300,13 +364,27 @@ Hosted files are untrusted. The server never uses cookie authentication, sends
 `application/octet-stream`. Bundle responses carry this default CSP:
 
 ```text
-default-src 'self' data: blob: https: 'unsafe-inline' 'unsafe-eval'; connect-src 'self'; form-action 'none'; frame-ancestors 'none'
+default-src 'self' data: blob: https: 'unsafe-inline' 'unsafe-eval'; connect-src 'self' https:; form-action 'none'; frame-ancestors 'none'
 ```
 
 Inline scripts/styles and HTTPS CDN assets are intentionally allowed because generated
-reports need them. This is not full isolation: bundles share an origin, so malicious
-content can reach another bundle whose unguessable ID it knows. Per-bundle origins are
-out of scope for v1.
+reports need them, and `connect-src` permits HTTPS so a report can render live data.
+Plain HTTP is deliberately excluded: it keeps a published page from probing the
+reader's own network (`http://192.168.x.x`, `http://localhost:11434`) from their
+browser.
+
+This is not a sandbox. `script-src` falls back to `https:`, so a bundle can already
+load and execute code from any HTTPS origin, and `img-src` can carry data outward in a
+URL — the CSP limits accidents, not a malicious uploader. The threat model is that
+whoever holds the upload token is trusted, and the reader and their network are not.
+
+By default bundles share an origin, so content can reach another bundle whose
+unguessable ID it knows. `--bundle-host` gives each bundle its own origin and removes
+that class entirely; see [Per-bundle origins](#per-bundle-origins).
+
+**While bundles share an origin with the API, the API must never accept ambient
+credentials.** It is bearer-token only for exactly this reason: a cookie session would
+let any published page call `/api/v1/*` with the reader's credentials.
 
 Writes stage in hidden temporary directories before an atomic rename; reads go through
 `os.OpenRoot`, so `..` and symlinks cannot escape the storage root.

@@ -4,6 +4,9 @@ import (
 	"bytes"
 	"encoding/json"
 	"net"
+	"os"
+	"path/filepath"
+	"strings"
 	"testing"
 	"time"
 
@@ -25,6 +28,7 @@ func TestLogListeningIncludesAppliedConfiguration(t *testing.T) {
 		BaseURL:    "https://bundles.example/",
 		TLSCert:    "/etc/hostebin/tls.crt",
 		ACMEDomain: "acme.example",
+		BundleHost: "*.bundles.example",
 		Tailscale:  true,
 		Funnel:     true,
 		MaxFiles:   12,
@@ -52,6 +56,7 @@ func TestLogListeningIncludesAppliedConfiguration(t *testing.T) {
 		"funnel":           true,
 		"bundle_base_url":  "https://bundles.example",
 		"acme_domain":      "acme.example",
+		"bundle_host":      "*.bundles.example",
 	}
 	for key, want := range wants {
 		if got := event[key]; got != want {
@@ -116,5 +121,56 @@ func TestLogListeningDoesNotRepeatConfiguration(t *testing.T) {
 	}
 	if _, ok := event["config_file"]; ok {
 		t.Error("configuration repeated on a subsequent listener")
+	}
+}
+
+func TestRunServeExplainsWhenPortZeroDisablesTheOnlyListener(t *testing.T) {
+	setUserConfigRoot(t, t.TempDir())
+	configFile := filepath.Join(t.TempDir(), "config.json")
+	contents, err := json.Marshal(map[string]any{
+		"data": t.TempDir(),
+		"port": 0,
+	})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if err := os.WriteFile(configFile, contents, 0o600); err != nil {
+		t.Fatal(err)
+	}
+
+	var stderr bytes.Buffer
+	if got := runServe([]string{"--config", configFile}, &stderr); got != exitUsage {
+		t.Fatalf("exit code = %d, want %d; stderr: %s", got, exitUsage, stderr.String())
+	}
+	for _, want := range []string{"port is 0", "HTTP listener is disabled", "set --port"} {
+		if !strings.Contains(stderr.String(), want) {
+			t.Errorf("stderr = %q, want it to contain %q", stderr.String(), want)
+		}
+	}
+}
+
+func TestBootstrapTokenFileCompatibility(t *testing.T) {
+	dataDir := t.TempDir()
+	got, err := loadBootstrapToken(dataDir, "")
+	if err != nil || got != "" {
+		t.Fatalf("missing token = %q, %v", got, err)
+	}
+	if err := writeBootstrapToken(dataDir, "legacy-or-generated-token"); err != nil {
+		t.Fatal(err)
+	}
+	got, err = loadBootstrapToken(dataDir, "")
+	if err != nil || got != "legacy-or-generated-token" {
+		t.Fatalf("stored token = %q, %v", got, err)
+	}
+	got, err = loadBootstrapToken(dataDir, "configured-token")
+	if err != nil || got != "configured-token" {
+		t.Fatalf("configured token = %q, %v", got, err)
+	}
+	info, err := os.Stat(filepath.Join(dataDir, "token"))
+	if err != nil {
+		t.Fatal(err)
+	}
+	if info.Mode().Perm() != 0o600 {
+		t.Fatalf("token mode = %v", info.Mode().Perm())
 	}
 }

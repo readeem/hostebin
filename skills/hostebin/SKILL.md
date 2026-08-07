@@ -11,6 +11,8 @@ person you are working with; they open it in a browser and see the rendered page
 Use it when the work product is visual or too large for chat: a report, a chart, a
 diff view, a generated site, a screenshot, a long Markdown document.
 
+For templates and advanced guidance on writing a document to publish here use the `beautiful-html-reports` skill.
+
 ## Uploading
 
 ```sh

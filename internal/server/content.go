@@ -12,17 +12,34 @@ import (
 	"github.com/readeem/hostebin/internal/store"
 )
 
+// serveBundle handles the path-based /b/{id}/{path...} route on the apex host.
+// In subdomain mode it only redirects, so a bundle is reachable from exactly one
+// origin and links shared before the switch keep working.
 func (s *Server) serveBundle(w http.ResponseWriter, r *http.Request) {
+	id := r.PathValue("id")
+	if s.cfg.BundleHost != "" {
+		target := s.bundleRoot(r, id) + "/" + r.PathValue("path")
+		if q := r.URL.RawQuery; q != "" {
+			target += "?" + q
+		}
+		http.Redirect(w, r, target, http.StatusMovedPermanently)
+		return
+	}
+	s.serveBundleContent(w, r, id, r.PathValue("path"))
+}
+
+func (s *Server) serveBundleContent(w http.ResponseWriter, r *http.Request, id, name string) {
 	if s.cfg.CSP != "off" {
 		w.Header().Set("Content-Security-Policy", s.cfg.CSP)
 	}
-	id := r.PathValue("id")
+	// Under subdomain hosting the bundle id *is* the origin, so a default
+	// referrer policy would hand it to every third party the page loads from.
+	w.Header().Set("Referrer-Policy", "no-referrer")
 	meta, err := s.cfg.Store.Get(id)
 	if err != nil {
 		http.NotFound(w, r)
 		return
 	}
-	name := r.PathValue("path")
 	if name == "" {
 		if meta.Entry != "" {
 			s.serveFile(w, r, meta, meta.Entry)

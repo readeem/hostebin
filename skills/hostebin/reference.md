@@ -10,6 +10,9 @@ debugging configuration.
 hostebin up [flags] <file|directory|->...   upload; prints one URL
 hostebin ls [flags]                         list live bundles
 hostebin rm [flags] <id>                    delete a bundle
+hostebin user ls|add|rm|disable|enable      manage users
+hostebin token new|rm                       rotate or revoke a token
+hostebin whoami [--json]                    show the current identity
 hostebin serve [flags]                      run the server
 hostebin version                            version, commit, build date
 ```
@@ -48,7 +51,8 @@ Config file location (mode `0600`, created on first run):
 | macOS | `~/Library/Application Support/hostebin/config.json` |
 | Windows | `%AppData%\hostebin\config.json` |
 
-Data directory (`token` file lives here): `${XDG_DATA_HOME:-~/.local/share}/hostebin`
+Data directory (`users.json`, bundles, and the legacy `token` file live here):
+`${XDG_DATA_HOME:-~/.local/share}/hostebin`
 on Linux/BSD, `<user config dir>/hostebin/data` elsewhere.
 
 ## HTTP API
@@ -79,7 +83,15 @@ curl -sf -H "Authorization: Bearer $HOSTEBIN_TOKEN" \
 | `PUT /api/v1/bundles/{id}?mode=replace` | Atomically replace all files |
 | `PUT /api/v1/bundles/{id}?mode=merge` | Atomically add/overwrite named files |
 | `GET /api/v1/bundles` | List live bundles |
+| `GET /api/v1/bundles?all=1` | Admin global view, including `owner_id` |
 | `DELETE /api/v1/bundles/{id}` | Delete a bundle |
+| `GET /api/v1/whoami` | Current user, role, token ID, and token label |
+| `GET /api/v1/users` | Users and token metadata; admin only |
+| `POST /api/v1/users` | Create `{name, role, label, ttl}` and return the first token once; admin only |
+| `PATCH /api/v1/users/{id}` | Set `{disabled}`; admin only |
+| `DELETE /api/v1/users/{id}` | Delete; use `?bundles=delete|reassign` when needed |
+| `PUT /api/v1/users/{id}/token` | Atomically replace the token, optional `{label, ttl}`; admin or self |
+| `DELETE /api/v1/users/{id}/token` | Revoke the token; admin or self |
 | `GET /b/{id}/...` | Public content; `?raw=1` disables Markdown rendering |
 
 Metadata fields: raw uploads use the `X-Hostebin-Filename`, `X-Hostebin-Title`,
@@ -115,8 +127,11 @@ Key server flags: `--data`, `--base-url`, `--max-upload` (default `32MiB`),
 `--max-files` (default `64`), `--default-ttl` (default `never`), `--csp`
 (`off` disables), `--tailscale`, `--funnel`, `--ts-hostname`, `--ts-auth-key`.
 
-On first start the server generates a token, writes it to `<data>/token` with mode
-`0600`, and logs it once. Expired bundles 404 immediately and are swept at startup
+On first start the server creates the `admin` user, generates a token, writes its
+digest to `<data>/users.json`, writes the plaintext compatibility copy to
+`<data>/token` with mode `0600`, and logs it once. Existing token files are migrated
+without changing the token, and legacy unowned bundles are adopted by `admin`.
+Expired bundles 404 immediately and are swept at startup
 and every ten minutes.
 
 ## Security model
@@ -124,4 +139,9 @@ and every ten minutes.
 Hosted content is untrusted: no cookie auth, `X-Content-Type-Options: nosniff`,
 unknown extensions served as `application/octet-stream`, and a permissive-but-scoped
 default CSP. All bundles share one origin, so an unguessable ID is the read
-capability — treat every bundle URL as a secret-bearing link.
+capability — treat every bundle URL as a secret-bearing link. Ownership scopes list,
+replace, and delete operations for regular users; admins reach every bundle. Reads stay
+public and unauthenticated.
+
+Each user has at most one bearer token. Creating a token atomically replaces the
+current token, and the old value fails authentication on the next request.
