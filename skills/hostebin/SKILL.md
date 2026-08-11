@@ -1,14 +1,31 @@
 ---
 name: hostebin
-description: Publish HTML pages, Markdown reports, charts, images, or whole static folders to a shareable web URL. Use whenever you need to give the user a readable link they can open in the browser.
+description: Publish HTML, Markdown, images, or a whole static folder to a shareable web URL with the hostebin CLI. Use when someone needs to read generated output in a browser instead of a terminal, or when an already-published link must be updated, listed, or deleted.
 ---
 
 # Publishing with hostebin
 
-`hostebin` uploads a small bundle of files and prints one URL. Hand that URL to the
-person you are working with; they open it in a browser and see the rendered page.
+`hostebin up` uploads a small bundle of files and prints one URL. Hand that URL to
+the person you are working with; they open it in a browser and see the rendered
+page.
 
-For templates and guidance on writing a good document to publish use the `beautiful-html` skill.
+## Publishing a writeup
+
+1. **Write the page.** The `beautiful-html` skill has the templates and the layout
+   rules for a document worth reading.
+2. **Upload it with a title and a TTL.**
+   ```sh
+   hostebin up --title 'Weekly report' --ttl 14d report.html
+   ```
+   The title is what the reader sees in the tab and in `hostebin ls`, so make it
+   say what the page is. The default expiry is `never`; two weeks outlives almost
+   every writeup, so pass `--ttl` unless the artifact is meant to be permanent.
+3. **Hand back the printed line verbatim.** A bundle renders at its root, and
+   `hostebin up` prints exactly that URL:
+
+   > ✅ `https://762a1b8266153f8ba48b.hostebin.example.com/`
+   >
+   > ❌ `https://762a1b8266153f8ba48b.hostebin.example.com/page.html`
 
 ## Uploading
 
@@ -24,13 +41,10 @@ hostebin up ./site/
 
 # generated content, no temp file needed
 printf '# Status\n\nAll green.\n' | hostebin up -n status.md -
-
-# expiring link with a title
-hostebin up --title 'Weekly report' --ttl 7d report.html
 ```
 
-`hostebin up` writes exactly one line to stdout: the URL. Everything else goes to
-stderr. Capture it directly:
+The URL is the only thing on stdout; everything else goes to stderr, so capture it
+directly:
 
 ```sh
 url=$(hostebin up report.html)
@@ -54,12 +68,11 @@ hostebin up --json report.html
 - **Reads are public.** Anyone with the link can read it. Never upload secrets,
   credentials, tokens, private keys, or personal data. Say so if the user asks you
   to publish something that looks sensitive.
-- **Prefer updating over re-uploading** when iterating on the same artifact, so the
-  link you already gave the person keeps working:
+- **Update in place while iterating**, so the link you already gave the person keeps
+  working:
   ```sh
   hostebin up --id <bundle-id> report.html
   ```
-- **Default expiry is never.** Use `--ttl 24h` / `--ttl 7d` for throwaway output.
 
 ## Managing what you published
 
@@ -84,4 +97,5 @@ Exit codes: `0` success, `1` usage/configuration error, `2` network or server er
 
 ## More detail
 
-Full flag list, HTTP API, and server setup: see `reference.md` next to this file.
+Full flag list, user and token commands, config precedence, HTTP API, and the
+security model: `reference.md` next to this file.

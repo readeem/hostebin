@@ -1,11 +1,17 @@
 ---
 name: beautiful-html
-description: Produce perfectly readable HTML pages. Use before writing any HTML meant to be opened as a link.
+description: Design HTML pages worth reading — reports, plans, research writeups, reviews, dashboards. Use before writing any HTML meant to be opened as a link.
 ---
 
-# Start from a template
+# Beautiful HTML
 
-Copy the closest one, then edit to speed up your work.
+A page built from these parts reads well in both themes, prints, and survives a
+dead CDN. Publish the finished file with the `hostebin` skill.
+
+## Start from a template
+
+Copy the closest one out of `templates/` next to this file into a scratch path
+(`/tmp/page.html`), then edit it down.
 
 | Template | Use for |
 | --- | --- |
@@ -13,10 +19,6 @@ Copy the closest one, then edit to speed up your work.
 | `templates/findings.html` | Code review, audits, triage, test results — many small items with a severity and a location. Filter chips and text search. |
 | `templates/dashboard.html` | Benchmarks, log summaries, run statistics — headline numbers, a chart, and the table behind them. |
 | `templates/shell.html` | Anything else. The `<head>`, a header, and an empty body. |
-
-```sh
-cp skills/beautiful-html/templates/report.html /tmp/page.html
-```
 
 Then work through it: replace the content, delete the sections you don't need, and
 pull anything extra from the two reference files next to this one —
@@ -31,8 +33,7 @@ depend on each other in it.
 - **Tailwind v4 loads from `cdn.jsdelivr.net`.** hostebin's default CSP allows
   `https:` scripts, so it compiles in the browser with no build step.
 - **`connect-src` is `'self' https:`.** A page *may* fetch from an HTTPS origin at
-  runtime, so a live API is available — see *Live data* below. Plain HTTP is not,
-  deliberately: it stops a published page probing the reader's own network.
+  runtime, so a live API is available — see *Live data* below.
 - **The favicon** is an inline `data:` SVG, so the tab icon needs no second file.
 - **The pre-paint script** sets the theme class before the body renders, so the page
   never flashes light before going dark.
@@ -97,13 +98,13 @@ needs a second hue usually wanted to be a table.
 `connect-src` allows any HTTPS origin, so a page can call an API and render what
 comes back. Three things follow from that, and the first is the one that matters.
 
-- **Inline the data anyway, when you have it.** A report of numbers you already
-  know should ship those numbers, not fetch them — it then renders identically in
-  a year, offline, and in print. Reach for `fetch` when the page's job is to be
-  *current*, not to save yourself pasting a dataset. `dashboard.html` inlines its
-  series in a `<script type="application/json">` for exactly this reason.
-- **Never put a credential in the page.** Reads are public: anyone with the link
-  has the key, and links get pasted into issues and chats. Only unauthenticated,
+- **Inline the data when you already have it.** A report of numbers you know should
+  ship those numbers, so it renders identically in a year, offline, and in print.
+  `fetch` is for a page whose job is to be *current*, not for saving yourself a
+  paste. `dashboard.html` inlines its series in a
+  `<script type="application/json">` for exactly this reason.
+- **Keep credentials out of the page.** Reads are public — anyone with the link has
+  the key, and links get pasted into issues and chats. Only unauthenticated,
   CORS-enabled endpoints belong here.
 - **Render something useful when the call fails**, because it will — CORS, an
   expired endpoint, a reader offline. Ship the last known values in the HTML and
@@ -111,8 +112,8 @@ comes back. Three things follow from that, and the first is the one that matters
   at 14:02" line. A permanent spinner is the one failure mode worse than static
   data.
 
-Plain HTTP is blocked, so `http://localhost:…` and LAN addresses will not work
-and should not be attempted.
+Only HTTPS origins are reachable, so `http://localhost:…` and LAN addresses are
+blocked by the CSP and are not worth attempting.
 
 ## Icons
 
@@ -129,11 +130,9 @@ takes its colour from whatever it sits in and is correct in both themes with no
 `dark:` variant. Size it with a utility: `size-3.5` in a badge, `size-4` in body
 text.
 
-- **Take them from the sprite, not from a CDN.** Icon fonts and Iconify both work
-  under the current CSP, and both make the page's chrome wait on a network round
-  trip that the rest of the page doesn't need — a slow CDN shows blank boxes where
-  the severity markers should be. The sprite has none of that and costs 24 lines.
-  `icons.md` has the full set and what each alternative actually costs.
+- **Take them from the sprite.** It costs 24 lines, no network, and no JS, so the
+  severity markers are there the moment the page paints. `icons.md` has the full
+  symbol set, and what every CDN-shaped alternative costs.
 - **An icon labels, it never decorates.** Severity, direction of change, the
   action a button performs, disclosure state, sort state. Not headings, not
   bullets.

@@ -1,14 +1,14 @@
 # hostebin reference
 
 Complete surface of the CLI and HTTP API. Load this when the basic `up`/`ls`/`rm`
-flow in `SKILL.md` is not enough — scripting against the API, running a server, or
-debugging configuration.
+flow in `SKILL.md` is not enough — scripting against the API, managing users and
+tokens, running a server, or debugging configuration.
 
 ## Commands
 
 ```text
 hostebin up [flags] <file|directory|->...   upload; prints one URL
-hostebin ls [flags]                         list live bundles
+hostebin ls [flags]                         list live bundles; --all covers every user (admin)
 hostebin rm [flags] <id>                    delete a bundle
 hostebin user ls|add|rm|disable|enable      manage users
 hostebin token new|rm                       rotate or revoke a token
