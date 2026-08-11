@@ -1,24 +1,11 @@
 ---
-name: beautiful-html-reports
-description: Design HTML pages worth reading — the shell, type, colour, icons, and behaviour behind a report, plan, research writeup, review, or metrics page published with hostebin. Use before writing any HTML meant to be opened as a link, or when another skill needs page design.
+name: beautiful-html
+description: Produce perfectly readable HTML pages. Use before writing any HTML meant to be opened as a link.
 ---
 
-# Beautiful HTML reports
+# Start from a template
 
-Someone is going to open your link, skim it for ten seconds, and decide whether to
-read it. Write a **document**: it opens with its title, states its conclusion, and
-lets the reader find the part they came for. What sinks these pages is reaching for
-the shapes of a product landing page — a full-height gradient hero, an emoji beside
-every heading, three sentences floating in a screen of whitespace. A reader wants
-the content.
-
-Publishing mechanics — `up`, `--ttl`, `--id`, updating a link you already gave
-someone — belong to the `hostebin` skill. This skill is only what goes in the file.
-
-## Start from a template
-
-Copy the closest one, then edit. Rewriting the `<head>` from scratch is how pages
-end up broken.
+Copy the closest one, then edit to speed up your work.
 
 | Template | Use for |
 | --- | --- |
@@ -28,7 +15,7 @@ end up broken.
 | `templates/shell.html` | Anything else. The `<head>`, a header, and an empty body. |
 
 ```sh
-cp skills/beautiful-html-reports/templates/report.html /tmp/page.html
+cp skills/beautiful-html/templates/report.html /tmp/page.html
 ```
 
 Then work through it: replace the content, delete the sections you don't need, and

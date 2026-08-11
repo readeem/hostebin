@@ -1,6 +1,6 @@
 ---
 name: hostebin
-description: Publish HTML pages, Markdown reports, charts, images, or whole static folders to a shareable web URL with the hostebin CLI. Use whenever a person needs to *view* generated output in a browser instead of reading it in a terminal, or when a previously shared link must be updated, listed, or deleted.
+description: Publish HTML pages, Markdown reports, charts, images, or whole static folders to a shareable web URL. Use whenever you need to give the user a readable link they can open in the browser.
 ---
 
 # Publishing with hostebin
@@ -8,10 +8,7 @@ description: Publish HTML pages, Markdown reports, charts, images, or whole stat
 `hostebin` uploads a small bundle of files and prints one URL. Hand that URL to the
 person you are working with; they open it in a browser and see the rendered page.
 
-Use it when the work product is visual or too large for chat: a report, a chart, a
-diff view, a generated site, a screenshot, a long Markdown document.
-
-For templates and advanced guidance on writing a document to publish here use the `beautiful-html-reports` skill.
+For templates and guidance on writing a good document to publish use the `beautiful-html` skill.
 
 ## Uploading
 

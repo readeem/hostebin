@@ -113,27 +113,6 @@ Create/replace responses:
 Status codes: `201` created, `200` updated, `204` deleted, `400` bad request,
 `401` bad token, `404` missing or expired, `413` too large.
 
-## Running a server
-
-```sh
-hostebin serve                                     # http://localhost:8080
-hostebin serve --host 0.0.0.0 --port 8080 --data /var/lib/hostebin
-hostebin serve --port 0 --tls-addr :8443 --tls-cert cert.pem --tls-key key.pem
-hostebin serve --port 0 --acme-domain files.example.com --acme-email ops@example.com
-HOSTEBIN_TS_AUTH_KEY=tskey-auth-... hostebin serve --port 0 --funnel
-```
-
-Key server flags: `--data`, `--base-url`, `--max-upload` (default `32MiB`),
-`--max-files` (default `64`), `--default-ttl` (default `never`), `--csp`
-(`off` disables), `--tailscale`, `--funnel`, `--ts-hostname`, `--ts-auth-key`.
-
-On first start the server creates the `admin` user, generates a token, writes its
-digest to `<data>/users.json`, writes the plaintext compatibility copy to
-`<data>/token` with mode `0600`, and logs it once. Existing token files are migrated
-without changing the token, and legacy unowned bundles are adopted by `admin`.
-Expired bundles 404 immediately and are swept at startup
-and every ten minutes.
-
 ## Security model
 
 Hosted content is untrusted: no cookie auth, `X-Content-Type-Options: nosniff`,
