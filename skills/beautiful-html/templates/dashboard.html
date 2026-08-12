@@ -1,49 +1,44 @@
 <!doctype html>
-<!--
-  Metrics page — for benchmark results, log summaries, run statistics: a few
-  headline numbers, one chart, and the table the numbers came from.
-  The <head> is the shared shell; see shell.html.
-
-  The chart at the bottom of this file is hand-rolled SVG on purpose: it needs
-  no library, prints, and re-themes with the page. Keep it to one series in
-  `accent`; the moment a chart needs a second hue it probably wants to be a
-  table.
--->
 <html lang="en" class="scroll-smooth">
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <title>REPLACE: Metrics title</title>
+<meta name="description" content="REPLACE: one sentence describing this run.">
 
-<!-- Favicon. An inline SVG data URI, so the tab icon costs no second file and
-     no request. Change the colour (and the glyph, from icons.md) so this report
-     is tellable apart from the other hostebin tabs the reader has open. -->
-<link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http%3A//www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='%230d9488' stroke-width='2.5' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpath d='M3 3v16a2 2 0 0 0 2 2h16'/%3E%3Cpath d='M18 17V9'/%3E%3Cpath d='M13 17V5'/%3E%3Cpath d='M8 17v-3'/%3E%3C/svg%3E">
+<!-- Required on every page. Change the hue and the glyph so this tab is
+     tellable apart from the reader's other tabs; icons.md has both. -->
+<link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http%3A//www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='%2334d399' stroke-width='2.5' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpath d='M3 3v16a2 2 0 0 0 2 2h16'/%3E%3Cpath d='M18 17V9'/%3E%3Cpath d='M13 17V5'/%3E%3Cpath d='M8 17v-3'/%3E%3C/svg%3E">
 
-<script>(()=>{try{const s=localStorage.getItem('theme');
-document.documentElement.classList.toggle('dark',s?s==='dark':matchMedia('(prefers-color-scheme:dark)').matches);}catch(e){}})();</script>
-<style>html{background:#f7f8fa;color:#22262c;font:16px/1.6 ui-sans-serif,system-ui,sans-serif}html.dark{background:#101318;color:#e6e9ee}</style>
+<script>(()=>{try{document.documentElement.classList.toggle('dark',localStorage.getItem('theme')!=='light')}catch(e){document.documentElement.classList.add('dark')}})();</script>
+<style>html{background:#000;color:#f5f5f5;font:16px/1.6 "DM Sans",ui-sans-serif,system-ui,sans-serif}html:not(.dark){background:#fff;color:#262626}</style>
+<link rel="preconnect" href="https://fonts.googleapis.com"><link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=DM+Sans:opsz,wght@9..40,400;9..40,500;9..40,600;9..40,700&family=JetBrains+Mono:wght@400;500&display=swap" rel="stylesheet">
 <script src="https://cdn.jsdelivr.net/npm/@tailwindcss/browser@4"></script>
 <style type="text/tailwindcss">
 @custom-variant dark (&:where(.dark, .dark *));
 
 :root {
-  --canvas: oklch(0.975 0.003 265); --surface: oklch(1 0 0);
-  --ink: oklch(0.27 0.02 265);      --muted: oklch(0.52 0.015 265);
-  --line: oklch(0.91 0.006 265);    --code: oklch(0.965 0.004 265);
-  --accent: oklch(0.52 0.17 258);   --accent-soft: oklch(0.95 0.035 258);
-  --ok: oklch(0.52 0.14 150);       --ok-soft: oklch(0.95 0.045 150);
-  --warn: oklch(0.52 0.13 70);      --warn-soft: oklch(0.96 0.055 85);
-  --bad: oklch(0.52 0.19 25);       --bad-soft: oklch(0.95 0.04 25);
+  --canvas: #ffffff;  --surface: #ffffff;
+  --ink: #262626;     --muted: #686868;
+  --line: color-mix(in oklab, #000 9%, transparent);
+  --code: color-mix(in oklab, #000 4%, transparent);
+  --accent: oklch(48.8% .217 264);
+  --ok: #059669;      --warn: #b45309;   --bad: #b91c1c;
 }
 .dark {
-  --canvas: oklch(0.16 0.012 265); --surface: oklch(0.20 0.014 265);
-  --ink: oklch(0.93 0.008 265);    --muted: oklch(0.68 0.012 265);
-  --line: oklch(0.30 0.016 265);   --code: oklch(0.185 0.013 265);
-  --accent: oklch(0.74 0.13 258);  --accent-soft: oklch(0.26 0.035 258);
-  --ok: oklch(0.76 0.15 155);      --ok-soft: oklch(0.25 0.032 155);
-  --warn: oklch(0.80 0.14 80);     --warn-soft: oklch(0.26 0.033 80);
-  --bad: oklch(0.72 0.16 25);      --bad-soft: oklch(0.26 0.04 25);
+  --canvas: #000000;  --surface: color-mix(in oklab, #fff 5%, #000);
+  --ink: #f5f5f5;     --muted: #818181;
+  --line: color-mix(in oklab, #fff 9%, transparent);
+  --code: color-mix(in oklab, #fff 5%, transparent);
+  --accent: oklch(65% .21 264);
+  --ok: #34d399;      --warn: #fbbf24;   --bad: #fb414a;
+}
+:root, .dark {
+  --accent-soft: color-mix(in oklab, var(--accent) 13%, transparent);
+  --ok-soft:     color-mix(in oklab, var(--ok) 13%, transparent);
+  --warn-soft:   color-mix(in oklab, var(--warn) 13%, transparent);
+  --bad-soft:    color-mix(in oklab, var(--bad) 13%, transparent);
 }
 @theme inline {
   --color-canvas: var(--canvas); --color-surface: var(--surface);
@@ -53,38 +48,35 @@ document.documentElement.classList.toggle('dark',s?s==='dark':matchMedia('(prefe
   --color-ok: var(--ok);         --color-ok-soft: var(--ok-soft);
   --color-warn: var(--warn);     --color-warn-soft: var(--warn-soft);
   --color-bad: var(--bad);       --color-bad-soft: var(--bad-soft);
+  --font-sans: "DM Sans", ui-sans-serif, system-ui, sans-serif;
+  --font-mono: "JetBrains Mono", "SF Mono", ui-monospace, monospace;
 }
 
 @layer components {
-  /* Icons. <svg class="icon"><use href="#i-name"/></svg> — see icons.md.
-     fill:none + stroke:currentColor is what makes one inherit text-bad,
-     text-muted, or anything else from the element it sits in. */
   .icon { @apply inline-block size-4 shrink-0 align-[-0.125em];
           fill: none; stroke: currentColor; stroke-width: 2;
           stroke-linecap: round; stroke-linejoin: round; }
 
-  .tile { @apply rounded-lg border border-line bg-surface px-4 py-3.5; }
-  .tile-label { @apply text-xs font-medium tracking-wide text-muted uppercase; }
-  .tile-value { @apply mt-1 text-2xl font-semibold tabular-nums text-ink; }
+  .tile { @apply rounded-xl border border-line bg-surface px-4 py-3.5; }
+  .tile-label { @apply font-mono text-[0.7rem] tracking-wide text-muted uppercase; }
+  .tile-value { @apply mt-1.5 text-3xl font-semibold tabular-nums text-ink; }
   th[data-sort] { @apply cursor-pointer select-none hover:text-ink; }
 }
 
 @media print {
-  :root { --canvas: #fff; --surface: #fff; --ink: #000; --muted: #444; --line: #bbb; --code: #f2f2f2; }
+  :root, .dark {
+    --canvas: #fff; --surface: #fff; --ink: #000; --muted: #444;
+    --line: #bbb; --code: #f2f2f2;
+  }
   .no-print { display: none !important; }
 }
 </style>
 </head>
 
-<body class="bg-canvas text-ink antialiased">
+<body class="bg-canvas font-sans text-ink antialiased">
 
-<!-- ── Icon sprite ───────────────────────────────────────────────────────
-     Lucide (ISC) pasted as <symbol>s: no icon request, no JS, one definition
-     however often an icon repeats. Add what the page needs from icons.md and
-     delete what it doesn't. The container is display:none; <use> still
-     resolves into it. -->
 <svg style="display:none" aria-hidden="true">
-  <symbol id="i-sun" viewBox="0 0 24 24"><circle cx="12" cy="12" r="4"/><path d="M12 2v2"/><path d="M12 20v2"/><path d="m4.93 4.93 1.41 1.41"/><path d="m17.66 17.66 1.41 1.41"/><path d="M2 12h2"/><path d="M20 12h2"/><path d="m6.34 17.66-1.41 1.41"/><path d="m19.07 4.93-1.41 1.41"/></symbol>
+  <symbol id="i-sun" viewBox="0 0 24 24"><circle cx="12" cy="12" r="4"/><path d="M12 2v2M12 20v2M4.93 4.93l1.41 1.41M17.66 17.66l1.41 1.41M2 12h2M20 12h2M6.34 17.66l-1.41 1.41M19.07 4.93l-1.41 1.41"/></symbol>
   <symbol id="i-moon" viewBox="0 0 24 24"><path d="M20.985 12.486a9 9 0 1 1-9.473-9.472c.405-.022.617.46.402.803a6 6 0 0 0 8.268 8.268c.344-.215.825-.004.803.401"/></symbol>
   <symbol id="i-trending-up" viewBox="0 0 24 24"><path d="M16 7h6v6"/><path d="m22 7-8.5 8.5-5-5L2 17"/></symbol>
   <symbol id="i-trending-down" viewBox="0 0 24 24"><path d="M16 17h6v-6"/><path d="m22 17-8.5-8.5-5 5L2 7"/></symbol>
@@ -94,28 +86,28 @@ document.documentElement.classList.toggle('dark',s?s==='dark':matchMedia('(prefe
   <symbol id="i-chevron-down" viewBox="0 0 24 24"><path d="m6 9 6 6 6-6"/></symbol>
 </svg>
 
-<div class="mx-auto max-w-5xl px-5 py-10 sm:px-8 lg:py-14">
+<div class="mx-auto max-w-5xl px-5 py-12 sm:px-8">
 
-  <header class="mb-8">
-    <div class="mb-3 flex items-start justify-between gap-4">
-      <p class="text-xs font-semibold tracking-widest text-accent uppercase">REPLACE: Run type</p>
-      <button id="theme-toggle" type="button"
-              class="no-print -mt-1 inline-flex shrink-0 items-center rounded-md border border-line p-1.5 text-muted hover:bg-surface hover:text-ink"
-              aria-label="Toggle dark mode" title="Toggle dark mode">
-        <svg class="icon dark:hidden" aria-hidden="true"><use href="#i-moon"/></svg>
-        <svg class="icon hidden dark:inline-block" aria-hidden="true"><use href="#i-sun"/></svg>
-      </button>
-    </div>
-    <h1 class="text-3xl font-semibold tracking-tight text-balance">REPLACE: What was measured</h1>
-    <p class="mt-3 max-w-[62ch] text-[0.975rem]/7 text-muted text-pretty">
-      REPLACE: what the numbers below mean and what changed since last time.
+  <div class="no-print mb-12 flex items-center justify-between font-mono text-[0.8rem] text-muted">
+    <span>REPLACE: repo / run / date</span>
+    <button id="theme-toggle" class="rounded-lg p-1.5 hover:bg-code hover:text-ink" aria-label="Toggle theme">
+      <svg class="icon size-4 dark:hidden" aria-hidden="true"><use href="#i-moon"/></svg>
+      <svg class="icon hidden size-4 dark:inline-block" aria-hidden="true"><use href="#i-sun"/></svg>
+    </button>
+  </div>
+
+  <!-- Hero: what the numbers say, not what was measured -->
+  <header class="mb-10">
+    <h1 class="max-w-[19ch] text-[2.6rem] leading-[1.03] font-semibold tracking-[-0.035em] text-balance sm:text-[3.6rem]">
+      REPLACE: what these numbers say
+    </h1>
+    <p class="mt-7 max-w-[64ch] text-xl/8 text-muted text-pretty">
+      REPLACE: what changed since last time, and whether it matters.
     </p>
   </header>
 
-  <!-- ── Headline numbers ──────────────────────────────────────────────── -->
-  <!-- Four at most. A number needs a unit and a comparison to mean anything.
-       The arrow gives the direction, the colour gives the verdict — note that
-       p95 rose and is therefore `bad`, while requests rose and are `ok`. -->
+  <!-- Four tiles at most. A number needs a unit and a comparison to mean
+       anything; the arrow gives direction, the colour gives the verdict. -->
   <section class="mb-10 grid grid-cols-2 gap-3 lg:grid-cols-4">
     <div class="tile">
       <p class="tile-label">Requests</p>
@@ -148,16 +140,14 @@ document.documentElement.classList.toggle('dark',s?s==='dark':matchMedia('(prefe
       <p class="tile-label">Bytes served</p>
       <p class="tile-value">41.2<span class="ml-0.5 text-base font-normal text-muted">GiB</span></p>
       <p class="mt-1 text-xs text-muted">
-        <svg class="icon mr-1 size-3.5 text-muted/60" aria-hidden="true"><use href="#i-minus"/></svg>no prior run
+        <svg class="icon mr-1 size-3.5" aria-hidden="true"><use href="#i-minus"/></svg>no prior run
       </p>
     </div>
   </section>
 
-  <!-- ── Chart ─────────────────────────────────────────────────────────── -->
-  <!-- Data is inlined as JSON: the CSP pins connect-src to 'self', so a page
-       cannot fetch it at runtime. Rendering to SVG keeps it crisp and printable. -->
+  <!-- One series in `accent`. A chart that needs a second hue wants to be a table. -->
   <section class="mb-10">
-    <h2 class="mb-1 text-lg font-semibold tracking-tight">REPLACE: what this chart shows</h2>
+    <h2 class="mb-1 text-xl font-semibold tracking-tight">REPLACE: what this chart shows</h2>
     <p class="mb-4 text-sm text-muted">REPLACE: the unit, and the window it covers.</p>
 
     <script id="series" type="application/json">
@@ -166,33 +156,30 @@ document.documentElement.classList.toggle('dark',s?s==='dark':matchMedia('(prefe
        {"label":"Sun","value":76}]
     </script>
 
-    <figure class="rounded-lg border border-line bg-surface p-4">
+    <figure class="rounded-xl border border-line bg-surface p-4">
       <svg id="chart" viewBox="0 0 720 220" class="w-full" role="img"
            aria-label="REPLACE: describe the chart's shape for screen readers"></svg>
     </figure>
   </section>
 
-  <!-- ── The underlying table ──────────────────────────────────────────── -->
   <!-- Always ship the numbers behind the chart. Click a header to sort. -->
   <section>
-    <h2 class="mb-4 text-lg font-semibold tracking-tight">By endpoint</h2>
-    <div class="overflow-x-auto rounded-lg border border-line">
+    <h2 class="mb-4 text-xl font-semibold tracking-tight">By endpoint</h2>
+    <div class="overflow-x-auto rounded-xl border border-line">
       <table id="data" class="w-full border-collapse text-sm">
-        <thead class="bg-surface text-left">
-          <!-- The chevrons say "this is sortable" before anyone clicks; the
-               script swaps each one for an up or down arrow once it is. -->
-          <tr class="border-b border-line text-muted">
-            <th class="px-4 py-2.5 font-semibold" data-sort="text">
-              <span class="inline-flex items-center gap-1.5">Endpoint<svg class="sort-icon icon size-3.5 text-muted/50" aria-hidden="true"><use href="#i-chevrons-up-down"/></svg></span>
+        <thead>
+          <tr class="border-b border-line bg-code/50 text-left font-mono text-[0.72rem] tracking-wide text-muted uppercase">
+            <th class="px-4 py-3 font-normal" data-sort="text">
+              <span class="inline-flex items-center gap-1.5">Endpoint<svg class="sort-icon icon size-3.5" aria-hidden="true"><use href="#i-chevrons-up-down"/></svg></span>
             </th>
-            <th class="px-4 py-2.5 text-right font-semibold" data-sort="num">
-              <span class="inline-flex items-center gap-1.5">Requests<svg class="sort-icon icon size-3.5 text-muted/50" aria-hidden="true"><use href="#i-chevrons-up-down"/></svg></span>
+            <th class="px-4 py-3 text-right font-normal" data-sort="num">
+              <span class="inline-flex items-center gap-1.5">Requests<svg class="sort-icon icon size-3.5" aria-hidden="true"><use href="#i-chevrons-up-down"/></svg></span>
             </th>
-            <th class="px-4 py-2.5 text-right font-semibold" data-sort="num">
-              <span class="inline-flex items-center gap-1.5">p95 (ms)<svg class="sort-icon icon size-3.5 text-muted/50" aria-hidden="true"><use href="#i-chevrons-up-down"/></svg></span>
+            <th class="px-4 py-3 text-right font-normal" data-sort="num">
+              <span class="inline-flex items-center gap-1.5">p95 (ms)<svg class="sort-icon icon size-3.5" aria-hidden="true"><use href="#i-chevrons-up-down"/></svg></span>
             </th>
-            <th class="px-4 py-2.5 text-right font-semibold" data-sort="num">
-              <span class="inline-flex items-center gap-1.5">Errors<svg class="sort-icon icon size-3.5 text-muted/50" aria-hidden="true"><use href="#i-chevrons-up-down"/></svg></span>
+            <th class="px-4 py-3 text-right font-normal" data-sort="num">
+              <span class="inline-flex items-center gap-1.5">Errors<svg class="sort-icon icon size-3.5" aria-hidden="true"><use href="#i-chevrons-up-down"/></svg></span>
             </th>
           </tr>
         </thead>
@@ -206,15 +193,13 @@ document.documentElement.classList.toggle('dark',s?s==='dark':matchMedia('(prefe
     </div>
   </section>
 
-  <footer class="mt-12 border-t border-line pt-5 text-sm text-muted">
+  <footer class="mt-14 border-t border-line pt-5 font-mono text-[0.75rem] text-muted">
     REPLACE: where this data came from and over what window.
   </footer>
 </div>
 
 <script>
-// ── Chart ──────────────────────────────────────────────────────────────
-// Hand-rolled SVG: no chart library to load, and it inherits the theme tokens
-// through currentColor, so it re-themes with the page for free.
+// Hand-rolled SVG: no chart library, and it re-themes with the page.
 (() => {
   const svg = document.getElementById('chart');
   const raw = document.getElementById('series')?.textContent;
@@ -236,7 +221,6 @@ document.documentElement.classList.toggle('dark',s?s==='dark':matchMedia('(prefe
     return n;
   };
 
-  // Gridlines and y labels. Four ticks is enough to read a value off.
   for (let i = 0; i <= 4; i++) {
     const y = padT + plotH - (plotH * i) / 4;
     svg.append(el('line', { x1: padL, x2: W - padR, y1: y, y2: y, stroke: 'currentColor', 'stroke-opacity': i ? 0.12 : 0.3 }));
@@ -255,7 +239,6 @@ document.documentElement.classList.toggle('dark',s?s==='dark':matchMedia('(prefe
   });
 })();
 
-// ── Sortable table ─────────────────────────────────────────────────────
 // The table is already in a sensible order in the HTML; this only reorders it.
 (() => {
   const table = document.getElementById('data');
@@ -277,14 +260,12 @@ document.documentElement.classList.toggle('dark',s?s==='dark':matchMedia('(prefe
       tbody.append(...rows);
       for (const other of table.querySelectorAll('th[data-sort]')) {
         other.removeAttribute('aria-sort');
-        const icon = other.querySelector('.sort-icon');
-        icon?.querySelector('use')?.setAttribute('href', '#i-chevrons-up-down');
-        icon?.classList.replace('text-ink', 'text-muted/50');
+        other.querySelector('.sort-icon use')?.setAttribute('href', '#i-chevrons-up-down');
+        other.classList.remove('text-ink');
       }
       th.setAttribute('aria-sort', asc ? 'ascending' : 'descending');
-      const icon = th.querySelector('.sort-icon');
-      icon?.querySelector('use')?.setAttribute('href', asc ? '#i-chevron-up' : '#i-chevron-down');
-      icon?.classList.replace('text-muted/50', 'text-ink');
+      th.querySelector('.sort-icon use')?.setAttribute('href', asc ? '#i-chevron-up' : '#i-chevron-down');
+      th.classList.add('text-ink');
     });
   }
 })();

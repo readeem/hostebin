@@ -207,7 +207,7 @@ very dark strokes disappear on one of them.
 The disclosure pattern, with no JavaScript:
 
 ```html
-<details class="group rounded-lg border border-line bg-surface px-4 py-3">
+<details class="group rounded-xl border border-line bg-surface px-4 py-3">
   <summary class="flex cursor-pointer list-none items-center gap-2 text-sm font-medium select-none [&::-webkit-details-marker]:hidden">
     <svg class="icon size-4 text-muted transition-transform group-open:rotate-90" aria-hidden="true"><use href="#i-chevron-right"/></svg>
     Failure scenario
