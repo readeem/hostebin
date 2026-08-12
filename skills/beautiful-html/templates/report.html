@@ -1,0 +1,386 @@
+<!doctype html>
+<html lang="en" class="scroll-smooth">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>REPLACE: Report title</title>
+<meta name="description" content="REPLACE: one sentence describing this report.">
+
+<!-- Required on every page. Change the hue and the glyph so this tab is
+     tellable apart from the reader's other tabs; icons.md has both. -->
+<link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http%3A//www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='%234f6bf0' stroke-width='2.5' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpath d='M6 22a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h8a2.4 2.4 0 0 1 1.704.706l3.588 3.588A2.4 2.4 0 0 1 20 8v12a2 2 0 0 1-2 2z'/%3E%3Cpath d='M14 2v5a1 1 0 0 0 1 1h5'/%3E%3Cpath d='M16 13H8'/%3E%3Cpath d='M16 17H8'/%3E%3C/svg%3E">
+
+<script>(()=>{try{document.documentElement.classList.toggle('dark',localStorage.getItem('theme')!=='light')}catch(e){document.documentElement.classList.add('dark')}})();</script>
+<style>html{background:#000;color:#f5f5f5;font:16px/1.6 "DM Sans",ui-sans-serif,system-ui,sans-serif}html:not(.dark){background:#fff;color:#262626}</style>
+<link rel="preconnect" href="https://fonts.googleapis.com"><link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=DM+Sans:opsz,wght@9..40,400;9..40,500;9..40,600;9..40,700&family=JetBrains+Mono:wght@400;500&display=swap" rel="stylesheet">
+<script src="https://cdn.jsdelivr.net/npm/@tailwindcss/browser@4"></script>
+<style type="text/tailwindcss">
+@custom-variant dark (&:where(.dark, .dark *));
+
+:root {
+  --canvas: #ffffff;  --surface: #ffffff;
+  --ink: #262626;     --muted: #686868;
+  --line: color-mix(in oklab, #000 9%, transparent);
+  --code: color-mix(in oklab, #000 4%, transparent);
+  --accent: oklch(48.8% .217 264);
+  --ok: #059669;      --warn: #b45309;   --bad: #b91c1c;
+  --t-cm: #7a7a7a;    --t-str: #047857;  --t-num: #b45309;
+  --t-kw: #7c3aed;    --t-fn: #2563eb;
+}
+.dark {
+  --canvas: #000000;  --surface: color-mix(in oklab, #fff 5%, #000);
+  --ink: #f5f5f5;     --muted: #818181;
+  --line: color-mix(in oklab, #fff 9%, transparent);
+  --code: color-mix(in oklab, #fff 5%, transparent);
+  --accent: oklch(65% .21 264);
+  --ok: #34d399;      --warn: #fbbf24;   --bad: #fb414a;
+  --t-cm: #6f6f6f;    --t-str: #34d399;  --t-num: #fbbf24;
+  --t-kw: #b48cff;    --t-fn: #7aa2ff;
+}
+:root, .dark {
+  --accent-soft: color-mix(in oklab, var(--accent) 13%, transparent);
+  --ok-soft:     color-mix(in oklab, var(--ok) 13%, transparent);
+  --warn-soft:   color-mix(in oklab, var(--warn) 13%, transparent);
+  --bad-soft:    color-mix(in oklab, var(--bad) 13%, transparent);
+}
+@theme inline {
+  --color-canvas: var(--canvas); --color-surface: var(--surface);
+  --color-ink: var(--ink);       --color-muted: var(--muted);
+  --color-line: var(--line);     --color-code: var(--code);
+  --color-accent: var(--accent); --color-accent-soft: var(--accent-soft);
+  --color-ok: var(--ok);         --color-ok-soft: var(--ok-soft);
+  --color-warn: var(--warn);     --color-warn-soft: var(--warn-soft);
+  --color-bad: var(--bad);       --color-bad-soft: var(--bad-soft);
+  --font-sans: "DM Sans", ui-sans-serif, system-ui, sans-serif;
+  --font-mono: "JetBrains Mono", "SF Mono", ui-monospace, monospace;
+}
+
+@layer components {
+  .icon { @apply inline-block size-4 shrink-0 align-[-0.125em];
+          fill: none; stroke: currentColor; stroke-width: 2;
+          stroke-linecap: round; stroke-linejoin: round; }
+
+  .prose-body { @apply text-[0.975rem]/7 text-ink/90; }
+  .prose-body p { @apply my-4; }
+  .prose-body ul { @apply my-4 list-disc space-y-2 pl-5 marker:text-muted; }
+  .prose-body ol { @apply my-4 list-decimal space-y-2 pl-5 marker:text-muted; }
+  .prose-body a { @apply text-accent underline decoration-accent/30 underline-offset-2 hover:decoration-accent; }
+  .prose-body strong { @apply font-semibold text-ink; }
+  .prose-body code { @apply rounded-md bg-code px-1.5 py-0.5 font-mono text-[0.85em] text-ink; }
+
+  /* Written by the highlighter at the end of <body>. */
+  .t-cm { color: var(--t-cm); } .t-str { color: var(--t-str); }
+  .t-num { color: var(--t-num); } .t-kw { color: var(--t-kw); }
+  .t-fn { color: var(--t-fn); }
+
+  .dl { @apply block w-max min-w-full px-4; }
+  .dl.add { background: color-mix(in oklab, var(--ok) 14%, transparent); }
+  .dl.del { background: color-mix(in oklab, var(--bad) 14%, transparent); }
+  .dl.hunk { color: var(--muted); background: color-mix(in oklab, var(--ink) 7%, transparent); }
+}
+
+@media print {
+  :root, .dark {
+    --canvas: #fff; --surface: #fff; --ink: #000; --muted: #444;
+    --line: #bbb; --code: #f2f2f2;
+    --t-cm: #767676; --t-str: #1a1a1a; --t-num: #1a1a1a; --t-kw: #000; --t-fn: #333;
+  }
+  .no-print { display: none !important; }
+  .t-kw { font-weight: 600; }
+  .dl.add, .dl.del { background: #f0f0f0; }
+  a[href^="http"]::after { content: " (" attr(href) ")"; font-size: 0.75em; word-break: break-all; }
+}
+</style>
+</head>
+
+<body class="bg-canvas font-sans text-ink antialiased">
+
+<!-- Lucide symbols. Add what the page uses from icons.md, delete the rest. -->
+<svg style="display:none" aria-hidden="true">
+  <symbol id="i-sun" viewBox="0 0 24 24"><circle cx="12" cy="12" r="4"/><path d="M12 2v2M12 20v2M4.93 4.93l1.41 1.41M17.66 17.66l1.41 1.41M2 12h2M20 12h2M6.34 17.66l-1.41 1.41M19.07 4.93l-1.41 1.41"/></symbol>
+  <symbol id="i-moon" viewBox="0 0 24 24"><path d="M20.985 12.486a9 9 0 1 1-9.473-9.472c.405-.022.617.46.402.803a6 6 0 0 0 8.268 8.268c.344-.215.825-.004.803.401"/></symbol>
+  <symbol id="i-triangle-alert" viewBox="0 0 24 24"><path d="m21.73 18-8-14a2 2 0 0 0-3.48 0l-8 14A2 2 0 0 0 4 21h16a2 2 0 0 0 1.73-3"/><path d="M12 9v4M12 17h.01"/></symbol>
+  <symbol id="i-circle-check" viewBox="0 0 24 24"><circle cx="12" cy="12" r="10"/><path d="m9 12 2 2 4-4"/></symbol>
+  <symbol id="i-chevron-right" viewBox="0 0 24 24"><path d="m9 18 6-6-6-6"/></symbol>
+  <symbol id="i-copy" viewBox="0 0 24 24"><rect width="14" height="14" x="8" y="8" rx="2"/><path d="M4 16c-1.1 0-2-.9-2-2V4c0-1.1.9-2 2-2h10c1.1 0 2 .9 2 2"/></symbol>
+  <symbol id="i-check" viewBox="0 0 24 24"><path d="M20 6 9 17l-5-5"/></symbol>
+</svg>
+
+<div class="mx-auto max-w-5xl px-5 py-12 sm:px-8">
+
+  <!-- Masthead -->
+  <div class="no-print mb-12 flex items-center justify-between font-mono text-[0.8rem] text-muted">
+    <span>REPLACE: repo / section / slug</span>
+    <button id="theme-toggle" class="rounded-lg p-1.5 hover:bg-code hover:text-ink" aria-label="Toggle theme">
+      <svg class="icon size-4 dark:hidden" aria-hidden="true"><use href="#i-moon"/></svg>
+      <svg class="icon hidden size-4 dark:inline-block" aria-hidden="true"><use href="#i-sun"/></svg>
+    </button>
+  </div>
+
+  <!-- Hero: the heading carries the finding, not the topic -->
+  <header>
+    <h1 class="max-w-[19ch] text-[2.9rem] leading-[1.02] font-semibold tracking-[-0.035em] text-balance sm:text-[4.1rem]">
+      REPLACE: what this report concluded
+    </h1>
+    <p class="mt-7 max-w-[64ch] text-xl/8 text-muted text-pretty">
+      REPLACE: one or two sentences giving the answer. A reader who stops here
+      should still get the point.
+    </p>
+
+    <dl class="mt-10 grid grid-cols-2 gap-x-8 gap-y-5 border-y border-line py-6 sm:grid-cols-4">
+      <div><dt class="font-mono text-[0.8rem] text-muted">REPLACE: label</dt><dd class="mt-1.5 font-mono text-xl tabular-nums">1,412</dd></div>
+      <div><dt class="font-mono text-[0.8rem] text-muted">REPLACE: label</dt><dd class="mt-1.5 font-mono text-xl tabular-nums text-warn">23h 59m</dd></div>
+      <div><dt class="font-mono text-[0.8rem] text-muted">REPLACE: label</dt><dd class="mt-1.5 font-mono text-xl tabular-nums">3</dd></div>
+      <div><dt class="font-mono text-[0.8rem] text-muted">REPLACE: label</dt><dd class="mt-1.5 font-mono text-xl text-ok">none</dd></div>
+    </dl>
+  </header>
+
+  <div class="mt-14 flex gap-12">
+
+    <nav class="no-print hidden w-44 shrink-0 lg:block" aria-label="Contents">
+      <div class="sticky top-12">
+        <p class="mb-3 px-2 font-mono text-[0.7rem] tracking-wide text-muted uppercase">Contents</p>
+        <ul id="toc" class="space-y-1 text-sm">
+          <li><a href="#summary"  class="block rounded-lg px-2 py-1.5 text-muted hover:bg-code hover:text-ink">Summary</a></li>
+          <li><a href="#findings" class="block rounded-lg px-2 py-1.5 text-muted hover:bg-code hover:text-ink">What we found</a></li>
+          <li><a href="#plan"     class="block rounded-lg px-2 py-1.5 text-muted hover:bg-code hover:text-ink">The plan</a></li>
+          <li><a href="#risks"    class="block rounded-lg px-2 py-1.5 text-muted hover:bg-code hover:text-ink">Risks</a></li>
+        </ul>
+      </div>
+    </nav>
+
+    <details class="no-print mb-8 rounded-xl border border-line bg-surface px-4 py-3 text-sm lg:hidden">
+      <summary class="cursor-pointer font-medium select-none">Contents</summary>
+      <ul class="mt-3 space-y-1.5 text-muted">
+        <li><a href="#summary" class="hover:text-ink">Summary</a></li>
+        <li><a href="#findings" class="hover:text-ink">What we found</a></li>
+        <li><a href="#plan" class="hover:text-ink">The plan</a></li>
+        <li><a href="#risks" class="hover:text-ink">Risks</a></li>
+      </ul>
+    </details>
+
+    <article class="min-w-0 flex-1">
+
+      <section id="summary" class="scroll-mt-12">
+        <h2 class="text-2xl font-semibold tracking-tight">Summary</h2>
+        <div class="prose-body max-w-[66ch]">
+          <p>REPLACE: lead with the conclusion, then support it.</p>
+          <ul>
+            <li>A finding, stated as a claim rather than a topic.</li>
+            <li>A second finding, with the <code>file.go:42</code> that shows it.</li>
+            <li>A third, linking to <a href="#plan">the plan</a> where it is addressed.</li>
+          </ul>
+        </div>
+
+        <!-- Callout: swap icon and colour together — triangle-alert/warn,
+             circle-x/bad, circle-check/ok, info/accent. -->
+        <aside class="my-6 max-w-[66ch] rounded-xl border border-line bg-surface p-4">
+          <p class="mb-1.5 flex items-center gap-2 text-sm font-semibold text-warn">
+            <svg class="icon size-4" aria-hidden="true"><use href="#i-triangle-alert"/></svg>REPLACE: the one thing not to miss
+          </p>
+          <p class="text-sm/6 text-ink/85">REPLACE: why it matters.</p>
+        </aside>
+      </section>
+
+      <section id="findings" class="mt-14 scroll-mt-12">
+        <h2 class="text-2xl font-semibold tracking-tight">What we found</h2>
+        <div class="mt-5 overflow-x-auto rounded-xl border border-line">
+          <table class="w-full border-collapse text-sm">
+            <thead>
+              <tr class="border-b border-line bg-code/50 text-left font-mono text-[0.72rem] tracking-wide text-muted uppercase">
+                <th class="px-4 py-3 font-normal">Area</th>
+                <th class="px-4 py-3 font-normal">Observation</th>
+                <th class="px-4 py-3 font-normal">Count</th>
+                <th class="px-4 py-3 font-normal">State</th>
+              </tr>
+            </thead>
+            <tbody class="divide-y divide-line">
+              <tr><td class="px-4 py-2.5 font-mono text-[0.8rem]">Ingest</td><td class="px-4 py-2.5 text-muted">REPLACE</td><td class="px-4 py-2.5 tabular-nums">318</td><td class="px-4 py-2.5 text-muted">Healthy</td></tr>
+              <tr><td class="px-4 py-2.5 font-mono text-[0.8rem]">Queue</td><td class="px-4 py-2.5 text-muted">REPLACE</td><td class="px-4 py-2.5 tabular-nums">1,904</td><td class="px-4 py-2.5 text-warn">Degraded</td></tr>
+              <tr><td class="px-4 py-2.5 font-mono text-[0.8rem]">Storage</td><td class="px-4 py-2.5 text-muted">REPLACE</td><td class="px-4 py-2.5 tabular-nums">17</td><td class="px-4 py-2.5 text-bad">Failing</td></tr>
+            </tbody>
+          </table>
+        </div>
+      </section>
+
+      <section id="plan" class="mt-14 scroll-mt-12">
+        <h2 class="text-2xl font-semibold tracking-tight">The plan</h2>
+        <div class="prose-body max-w-[66ch]">
+          <ol>
+            <li>REPLACE: a step, written as an action.</li>
+            <li>REPLACE: the next step.</li>
+          </ol>
+        </div>
+
+        <!-- Diff: paste the patch as text and add data-diff. -->
+        <figure class="group relative my-6 overflow-hidden rounded-xl border border-line bg-surface">
+          <figcaption class="flex items-center justify-between border-b border-line px-4 py-2.5 font-mono text-[0.75rem] text-muted">
+            <span>REPLACE: path/to/file.go</span>
+            <button class="copy-btn no-print flex items-center gap-1.5 rounded-lg px-2 py-1 opacity-0 transition group-hover:opacity-100 hover:bg-code hover:text-ink focus:opacity-100">
+              <svg class="icon size-3.5" aria-hidden="true"><use href="#i-copy"/></svg><span class="copy-label">Copy</span>
+            </button>
+          </figcaption>
+          <pre data-lang="go" data-diff class="overflow-x-auto py-3.5 font-mono text-[0.8rem]/6"><code>@@ -218,7 +218,7 @@ func (s *Server) createBundle(w http.ResponseWriter, r *http.Request) {
+ 	ttl, err := ParseDuration(raw)
+-	exp := now.Add(ttl).Truncate(24 * time.Hour)
++	exp := now.Add(ttl)
+ 	meta.ExpiresAt = &amp;exp</code></pre>
+        </figure>
+
+        <!-- Snippet: data-lang alone. go, js, ts, py, sh, sql, json. -->
+        <figure class="group relative my-6 overflow-hidden rounded-xl border border-line bg-surface">
+          <figcaption class="flex items-center justify-between border-b border-line px-4 py-2.5 font-mono text-[0.75rem] text-muted">
+            <span>REPLACE: path/to/file.go</span>
+            <button class="copy-btn no-print flex items-center gap-1.5 rounded-lg px-2 py-1 opacity-0 transition group-hover:opacity-100 hover:bg-code hover:text-ink focus:opacity-100">
+              <svg class="icon size-3.5" aria-hidden="true"><use href="#i-copy"/></svg><span class="copy-label">Copy</span>
+            </button>
+          </figcaption>
+          <pre data-lang="go" class="overflow-x-auto px-4 py-3.5 font-mono text-[0.8rem]/6"><code>// REPLACE: the smallest snippet that makes the point.
+func (s *Store) Backfill(ctx context.Context) (int, error) {
+	n := 0
+	for _, m := range s.Live() {
+		if err := s.SetExpiry(ctx, m.ID, m.CreatedAt.Add(m.TTL)); err != nil {
+			return n, fmt.Errorf("bundle %q: %w", m.ID, err)
+		}
+		n++
+	}
+	return n, nil
+}</code></pre>
+        </figure>
+
+        <details class="group max-w-[66ch] rounded-xl border border-line bg-surface px-4 py-3">
+          <summary class="flex cursor-pointer list-none items-center gap-2 text-sm font-medium select-none [&::-webkit-details-marker]:hidden">
+            <svg class="icon size-4 text-muted transition-transform group-open:rotate-90" aria-hidden="true"><use href="#i-chevron-right"/></svg>
+            REPLACE: supporting detail, folded away
+          </summary>
+          <p class="prose-body mt-3 border-t border-line pt-3">REPLACE.</p>
+        </details>
+      </section>
+
+      <section id="risks" class="mt-14 scroll-mt-12">
+        <h2 class="text-2xl font-semibold tracking-tight">Risks</h2>
+        <div class="prose-body max-w-[66ch]">
+          <p>REPLACE: what could go wrong, and what you would do about it.</p>
+        </div>
+        <p class="mt-6 inline-flex items-center gap-2 rounded-full bg-ok-soft px-3 py-1.5 text-sm text-ok">
+          <svg class="icon size-4" aria-hidden="true"><use href="#i-circle-check"/></svg>REPLACE: the verdict in five words
+        </p>
+      </section>
+
+      <footer class="mt-16 border-t border-line pt-5 font-mono text-[0.75rem] text-muted">
+        REPLACE: how this was produced, and where the underlying data lives.
+      </footer>
+    </article>
+  </div>
+</div>
+
+<script>
+// Every behaviour below is an enhancement: the page is complete without it.
+
+document.getElementById('theme-toggle')?.addEventListener('click', () => {
+  const dark = document.documentElement.classList.toggle('dark');
+  try { localStorage.setItem('theme', dark ? 'dark' : 'light'); } catch (e) {}
+});
+
+// ── Syntax and diff highlighting ──────────────────────────────────────────
+// Add a language to SYNTAX to support it; anything unlisted renders plain.
+const SYNTAX = {
+  go:   { cm: /\/\/[^\n]*|\/\*[\s\S]*?\*\//, kw: 'break case chan const continue default defer else fallthrough for func go goto if import interface map package range return select struct switch type var nil true false' },
+  js:   { cm: /\/\/[^\n]*|\/\*[\s\S]*?\*\//, kw: 'async await break case catch class const continue default delete do else export extends finally for from function if import in instanceof let new of return super switch this throw try typeof var void while yield null true false undefined' },
+  ts:   { cm: /\/\/[^\n]*|\/\*[\s\S]*?\*\//, kw: 'async await break case catch class const continue declare default delete do else enum export extends finally for from function if implements import in infer instanceof interface keyof let new of readonly return satisfies super switch this throw try type typeof var void while yield null true false undefined' },
+  py:   { cm: /#[^\n]*/, kw: 'and as assert async await break class continue def del elif else except finally for from global if import in is lambda None nonlocal not or pass raise return try while with yield True False' },
+  sh:   { cm: /#[^\n]*/, kw: 'if then elif else fi for while until do done case esac function return export local readonly shift source trap set' },
+  sql:  { cm: /--[^\n]*|\/\*[\s\S]*?\*\//, kw: 'select from where join left right inner outer full on group by order having limit offset union all insert into values update set delete create alter drop table index view as and or not null is distinct count sum avg min max case when then else end' },
+  json: { cm: null, kw: 'true false null' },
+};
+const RX_STR = /"(?:\\.|[^"\\])*"|'(?:\\.|[^'\\])*'|`(?:\\.|[^`\\])*`/;
+const RX_NUM = /\b0[xX][0-9a-fA-F]+\b|\b\d[\d_]*(?:\.\d+)?\b/;
+const RX_FN  = /\b[A-Za-z_]\w*(?=\()/;
+const esc = s => s.replace(/[&<>]/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;' })[c]);
+
+// Keywords run before function names so `if (` reads as a keyword, not a call.
+const rules = new Map();
+function rule(lang) {
+  if (!rules.has(lang)) {
+    const g = SYNTAX[lang];
+    rules.set(lang, !g ? null : new RegExp([
+      g.cm && `(?<cm>${g.cm.source})`,
+      `(?<str>${RX_STR.source})`,
+      `(?<num>${RX_NUM.source})`,
+      `(?<kw>\\b(?:${g.kw.split(' ').join('|')})\\b)`,
+      `(?<fn>${RX_FN.source})`,
+    ].filter(Boolean).join('|'), 'g'));
+  }
+  return rules.get(lang);
+}
+
+function highlight(text, lang) {
+  const rx = rule(lang);
+  if (!rx) return esc(text);
+  let out = '', last = 0;
+  for (const m of text.matchAll(rx)) {
+    const [kind, value] = Object.entries(m.groups).find(([, v]) => v !== undefined);
+    out += esc(text.slice(last, m.index)) + `<span class="t-${kind}">${esc(value)}</span>`;
+    last = m.index + m[0].length;
+  }
+  return out + esc(text.slice(last));
+}
+
+// A diff line's state is its first character: + added, - removed, @ hunk header.
+const DIFF = { '+': 'add', '-': 'del', '@': 'hunk' };
+
+for (const pre of document.querySelectorAll('pre[data-lang]')) {
+  const code = pre.querySelector('code') ?? pre;
+  const lang = pre.dataset.lang;
+  if (pre.hasAttribute('data-diff')) {
+    code.innerHTML = code.textContent.split('\n').map(line => {
+      const state = DIFF[line[0]] ?? 'ctx';
+      const body = state === 'hunk' ? esc(line) : esc(line.slice(0, 1)) + highlight(line.slice(1), lang);
+      return `<span class="dl ${state}">${body || '&nbsp;'}</span>`;
+    }).join('');
+  } else {
+    code.innerHTML = highlight(code.textContent, lang);
+  }
+}
+
+// Copy code. Swapping the <use> href rather than textContent keeps the icon.
+for (const btn of document.querySelectorAll('.copy-btn')) {
+  const icon = btn.querySelector('use');
+  const label = btn.querySelector('.copy-label');
+  const set = (id, text) => { icon?.setAttribute('href', id); if (label) label.textContent = text; };
+  btn.addEventListener('click', async () => {
+    const code = btn.closest('figure')?.querySelector('code');
+    if (!code) return;
+    try {
+      await navigator.clipboard.writeText(code.innerText);
+      set('#i-check', 'Copied');
+      setTimeout(() => set('#i-copy', 'Copy'), 1200);
+    } catch (e) { set('#i-copy', 'Press ⌘C'); }
+  });
+}
+
+// Highlight the contents entry for the section being read.
+const links = new Map();
+for (const a of document.querySelectorAll('#toc a')) links.set(a.getAttribute('href').slice(1), a);
+if (links.size) {
+  const visible = new Set();
+  const paint = () => {
+    const active = [...links.keys()].find(id => visible.has(id)) ?? [...links.keys()][0];
+    for (const [id, a] of links) {
+      a.classList.toggle('bg-code', id === active);
+      a.classList.toggle('text-ink', id === active);
+      a.classList.toggle('font-medium', id === active);
+      a.classList.toggle('text-muted', id !== active);
+    }
+  };
+  const spy = new IntersectionObserver(es => {
+    for (const e of es) e.isIntersecting ? visible.add(e.target.id) : visible.delete(e.target.id);
+    paint();
+  }, { rootMargin: '-12% 0px -70% 0px' });
+  for (const s of document.querySelectorAll('section[id]')) spy.observe(s);
+  paint();
+}
+</script>
+</body>
+</html>

@@ -1,0 +1,309 @@
+<!doctype html>
+<html lang="en" class="scroll-smooth">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>REPLACE: Review title</title>
+<meta name="description" content="REPLACE: one sentence describing this review.">
+
+<!-- Required on every page. Change the hue and the glyph so this tab is
+     tellable apart from the reader's other tabs; icons.md has both. -->
+<link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http%3A//www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='%23b48cff' stroke-width='2.5' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpath d='M13 5h8'/%3E%3Cpath d='M13 12h8'/%3E%3Cpath d='M13 19h8'/%3E%3Cpath d='m3 17 2 2 4-4'/%3E%3Cpath d='m3 7 2 2 4-4'/%3E%3C/svg%3E">
+
+<script>(()=>{try{document.documentElement.classList.toggle('dark',localStorage.getItem('theme')!=='light')}catch(e){document.documentElement.classList.add('dark')}})();</script>
+<style>html{background:#000;color:#f5f5f5;font:16px/1.6 "DM Sans",ui-sans-serif,system-ui,sans-serif}html:not(.dark){background:#fff;color:#262626}</style>
+<link rel="preconnect" href="https://fonts.googleapis.com"><link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=DM+Sans:opsz,wght@9..40,400;9..40,500;9..40,600;9..40,700&family=JetBrains+Mono:wght@400;500&display=swap" rel="stylesheet">
+<script src="https://cdn.jsdelivr.net/npm/@tailwindcss/browser@4"></script>
+<style type="text/tailwindcss">
+@custom-variant dark (&:where(.dark, .dark *));
+
+:root {
+  --canvas: #ffffff;  --surface: #ffffff;
+  --ink: #262626;     --muted: #686868;
+  --line: color-mix(in oklab, #000 9%, transparent);
+  --code: color-mix(in oklab, #000 4%, transparent);
+  --accent: oklch(48.8% .217 264);
+  --ok: #059669;      --warn: #b45309;   --bad: #b91c1c;
+  --t-cm: #7a7a7a;    --t-str: #047857;  --t-num: #b45309;
+  --t-kw: #7c3aed;    --t-fn: #2563eb;
+}
+.dark {
+  --canvas: #000000;  --surface: color-mix(in oklab, #fff 5%, #000);
+  --ink: #f5f5f5;     --muted: #818181;
+  --line: color-mix(in oklab, #fff 9%, transparent);
+  --code: color-mix(in oklab, #fff 5%, transparent);
+  --accent: oklch(65% .21 264);
+  --ok: #34d399;      --warn: #fbbf24;   --bad: #fb414a;
+  --t-cm: #6f6f6f;    --t-str: #34d399;  --t-num: #fbbf24;
+  --t-kw: #b48cff;    --t-fn: #7aa2ff;
+}
+:root, .dark {
+  --accent-soft: color-mix(in oklab, var(--accent) 13%, transparent);
+  --ok-soft:     color-mix(in oklab, var(--ok) 13%, transparent);
+  --warn-soft:   color-mix(in oklab, var(--warn) 13%, transparent);
+  --bad-soft:    color-mix(in oklab, var(--bad) 13%, transparent);
+}
+@theme inline {
+  --color-canvas: var(--canvas); --color-surface: var(--surface);
+  --color-ink: var(--ink);       --color-muted: var(--muted);
+  --color-line: var(--line);     --color-code: var(--code);
+  --color-accent: var(--accent); --color-accent-soft: var(--accent-soft);
+  --color-ok: var(--ok);         --color-ok-soft: var(--ok-soft);
+  --color-warn: var(--warn);     --color-warn-soft: var(--warn-soft);
+  --color-bad: var(--bad);       --color-bad-soft: var(--bad-soft);
+  --font-sans: "DM Sans", ui-sans-serif, system-ui, sans-serif;
+  --font-mono: "JetBrains Mono", "SF Mono", ui-monospace, monospace;
+}
+
+@layer components {
+  .icon { @apply inline-block size-4 shrink-0 align-[-0.125em];
+          fill: none; stroke: currentColor; stroke-width: 2;
+          stroke-linecap: round; stroke-linejoin: round; }
+
+  .prose-body { @apply text-[0.975rem]/7 text-ink/90; }
+  .prose-body p { @apply my-4; }
+  .prose-body code { @apply rounded-md bg-code px-1.5 py-0.5 font-mono text-[0.85em] text-ink; }
+
+  .chip { @apply cursor-pointer rounded-full border border-line px-3 py-1 text-sm text-muted transition hover:text-ink; }
+  .chip[aria-pressed="true"] { @apply border-accent bg-accent-soft font-medium text-accent; }
+
+  .t-cm { color: var(--t-cm); } .t-str { color: var(--t-str); }
+  .t-num { color: var(--t-num); } .t-kw { color: var(--t-kw); }
+  .t-fn { color: var(--t-fn); }
+}
+
+@media print {
+  :root, .dark {
+    --canvas: #fff; --surface: #fff; --ink: #000; --muted: #444;
+    --line: #bbb; --code: #f2f2f2;
+    --t-cm: #767676; --t-str: #1a1a1a; --t-num: #1a1a1a; --t-kw: #000; --t-fn: #333;
+  }
+  .no-print { display: none !important; }
+  details, details > * { display: block !important; }
+}
+</style>
+</head>
+
+<body class="bg-canvas font-sans text-ink antialiased">
+
+<svg style="display:none" aria-hidden="true">
+  <symbol id="i-sun" viewBox="0 0 24 24"><circle cx="12" cy="12" r="4"/><path d="M12 2v2M12 20v2M4.93 4.93l1.41 1.41M17.66 17.66l1.41 1.41M2 12h2M20 12h2M6.34 17.66l-1.41 1.41M19.07 4.93l-1.41 1.41"/></symbol>
+  <symbol id="i-moon" viewBox="0 0 24 24"><path d="M20.985 12.486a9 9 0 1 1-9.473-9.472c.405-.022.617.46.402.803a6 6 0 0 0 8.268 8.268c.344-.215.825-.004.803.401"/></symbol>
+  <symbol id="i-circle-x" viewBox="0 0 24 24"><circle cx="12" cy="12" r="10"/><path d="m15 9-6 6M9 9l6 6"/></symbol>
+  <symbol id="i-triangle-alert" viewBox="0 0 24 24"><path d="m21.73 18-8-14a2 2 0 0 0-3.48 0l-8 14A2 2 0 0 0 4 21h16a2 2 0 0 0 1.73-3"/><path d="M12 9v4M12 17h.01"/></symbol>
+  <symbol id="i-info" viewBox="0 0 24 24"><circle cx="12" cy="12" r="10"/><path d="M12 16v-4M12 8h.01"/></symbol>
+  <symbol id="i-chevron-right" viewBox="0 0 24 24"><path d="m9 18 6-6-6-6"/></symbol>
+  <symbol id="i-search" viewBox="0 0 24 24"><circle cx="11" cy="11" r="8"/><path d="m21 21-4.34-4.34"/></symbol>
+</svg>
+
+<div class="mx-auto max-w-4xl px-5 py-12 sm:px-8">
+
+  <div class="no-print mb-12 flex items-center justify-between font-mono text-[0.8rem] text-muted">
+    <span>REPLACE: repo / branch / review</span>
+    <button id="theme-toggle" class="rounded-lg p-1.5 hover:bg-code hover:text-ink" aria-label="Toggle theme">
+      <svg class="icon size-4 dark:hidden" aria-hidden="true"><use href="#i-moon"/></svg>
+      <svg class="icon hidden size-4 dark:inline-block" aria-hidden="true"><use href="#i-sun"/></svg>
+    </button>
+  </div>
+
+  <!-- Hero: the verdict, not the topic -->
+  <header>
+    <h1 class="max-w-[19ch] text-[2.6rem] leading-[1.03] font-semibold tracking-[-0.035em] text-balance sm:text-[3.6rem]">
+      REPLACE: the verdict on this change
+    </h1>
+    <p class="mt-7 max-w-[64ch] text-xl/8 text-muted text-pretty">
+      REPLACE: is this good to merge, and what is the one thing to fix first?
+    </p>
+
+    <!-- Counts derive from the list below; keep them honest. -->
+    <dl class="mt-10 grid grid-cols-2 gap-x-8 gap-y-5 border-y border-line py-6 sm:grid-cols-4">
+      <div><dt class="font-mono text-[0.8rem] text-muted">High</dt><dd class="mt-1.5 font-mono text-xl tabular-nums text-bad">2</dd></div>
+      <div><dt class="font-mono text-[0.8rem] text-muted">Medium</dt><dd class="mt-1.5 font-mono text-xl tabular-nums text-warn">1</dd></div>
+      <div><dt class="font-mono text-[0.8rem] text-muted">Low</dt><dd class="mt-1.5 font-mono text-xl tabular-nums">1</dd></div>
+      <div><dt class="font-mono text-[0.8rem] text-muted">Reviewed</dt><dd class="mt-1.5 font-mono text-xl tabular-nums">14 files</dd></div>
+    </dl>
+  </header>
+
+  <!-- Filters. With JS off, every finding stays visible. -->
+  <div class="no-print mt-10 mb-6 flex flex-wrap items-center gap-2">
+    <button class="chip" data-filter="all"    aria-pressed="true">All</button>
+    <button class="chip" data-filter="high"   aria-pressed="false">High</button>
+    <button class="chip" data-filter="medium" aria-pressed="false">Medium</button>
+    <button class="chip" data-filter="low"    aria-pressed="false">Low</button>
+    <label class="relative ml-auto flex items-center">
+      <span class="sr-only">Filter by text</span>
+      <svg class="icon pointer-events-none absolute left-2.5 size-4 text-muted" aria-hidden="true"><use href="#i-search"/></svg>
+      <input id="q" type="search" placeholder="Filter…" autocomplete="off"
+             class="w-44 rounded-lg border border-line bg-surface py-1.5 pr-3 pl-8 text-sm text-ink placeholder:text-muted focus:border-accent focus:ring-2 focus:ring-accent/25 focus:outline-none">
+    </label>
+  </div>
+
+  <!-- data-severity drives filtering. Rail, icon and label always agree, so a
+       reader who cannot separate the hues still reads the severity. -->
+  <ul id="findings" class="space-y-3">
+
+    <li class="finding" data-severity="high">
+      <article class="overflow-hidden rounded-xl border border-line border-l-4 border-l-bad bg-surface">
+        <div class="px-4 py-3.5">
+          <div class="flex flex-wrap items-baseline justify-between gap-x-4 gap-y-1">
+            <h2 class="font-semibold text-balance">REPLACE: the defect, stated as a claim</h2>
+            <span class="inline-flex shrink-0 items-center gap-1.5 rounded-full bg-bad-soft px-2 py-0.5 text-xs font-medium text-bad">
+              <svg class="icon size-3.5" aria-hidden="true"><use href="#i-circle-x"/></svg>High
+            </span>
+          </div>
+          <p class="mt-1 font-mono text-xs text-muted">REPLACE: path/to/file.go:118</p>
+          <p class="mt-2 text-sm/6 text-ink/90">REPLACE: one sentence on what goes wrong.</p>
+
+          <details class="group mt-3 border-t border-line pt-3">
+            <summary class="flex cursor-pointer list-none items-center gap-2 text-sm font-medium text-muted select-none hover:text-ink [&::-webkit-details-marker]:hidden">
+              <svg class="icon size-4 transition-transform group-open:rotate-90" aria-hidden="true"><use href="#i-chevron-right"/></svg>
+              Failure scenario
+            </summary>
+            <p class="mt-2 text-sm/6 text-ink/90">
+              REPLACE: concrete inputs or state, then the wrong output or crash they produce.
+            </p>
+            <pre data-lang="go" class="mt-3 overflow-x-auto rounded-lg bg-code px-3 py-2.5 font-mono text-xs/6"><code>exp := now.Add(ttl).Truncate(24 * time.Hour) // REPLACE</code></pre>
+          </details>
+        </div>
+      </article>
+    </li>
+
+    <li class="finding" data-severity="high">
+      <article class="overflow-hidden rounded-xl border border-line border-l-4 border-l-bad bg-surface">
+        <div class="px-4 py-3.5">
+          <div class="flex flex-wrap items-baseline justify-between gap-x-4 gap-y-1">
+            <h2 class="font-semibold text-balance">REPLACE: a second defect</h2>
+            <span class="inline-flex shrink-0 items-center gap-1.5 rounded-full bg-bad-soft px-2 py-0.5 text-xs font-medium text-bad">
+              <svg class="icon size-3.5" aria-hidden="true"><use href="#i-circle-x"/></svg>High
+            </span>
+          </div>
+          <p class="mt-1 font-mono text-xs text-muted">REPLACE: path/to/file.go:249</p>
+          <p class="mt-2 text-sm/6 text-ink/90">REPLACE: what goes wrong.</p>
+        </div>
+      </article>
+    </li>
+
+    <li class="finding" data-severity="medium">
+      <article class="overflow-hidden rounded-xl border border-line border-l-4 border-l-warn bg-surface">
+        <div class="px-4 py-3.5">
+          <div class="flex flex-wrap items-baseline justify-between gap-x-4 gap-y-1">
+            <h2 class="font-semibold text-balance">REPLACE: something worth changing</h2>
+            <span class="inline-flex shrink-0 items-center gap-1.5 rounded-full bg-warn-soft px-2 py-0.5 text-xs font-medium text-warn">
+              <svg class="icon size-3.5" aria-hidden="true"><use href="#i-triangle-alert"/></svg>Medium
+            </span>
+          </div>
+          <p class="mt-1 font-mono text-xs text-muted">REPLACE: path/to/file.go:63</p>
+          <p class="mt-2 text-sm/6 text-ink/90">REPLACE: what goes wrong.</p>
+        </div>
+      </article>
+    </li>
+
+    <li class="finding" data-severity="low">
+      <article class="overflow-hidden rounded-xl border border-line border-l-4 border-l-line bg-surface">
+        <div class="px-4 py-3.5">
+          <div class="flex flex-wrap items-baseline justify-between gap-x-4 gap-y-1">
+            <h2 class="font-semibold text-balance">REPLACE: a nit</h2>
+            <span class="inline-flex shrink-0 items-center gap-1.5 rounded-full bg-code px-2 py-0.5 text-xs font-medium text-muted">
+              <svg class="icon size-3.5" aria-hidden="true"><use href="#i-info"/></svg>Low
+            </span>
+          </div>
+          <p class="mt-1 font-mono text-xs text-muted">REPLACE: path/to/file.go:12</p>
+          <p class="mt-2 text-sm/6 text-ink/90">REPLACE: what goes wrong.</p>
+        </div>
+      </article>
+    </li>
+
+  </ul>
+
+  <p id="empty" class="hidden rounded-xl border border-dashed border-line px-4 py-10 text-center text-sm text-muted">
+    <svg class="icon mx-auto mb-2 block size-6" aria-hidden="true"><use href="#i-search"/></svg>
+    Nothing matches that filter.
+  </p>
+
+  <footer class="mt-14 border-t border-line pt-5 font-mono text-[0.75rem] text-muted">
+    REPLACE: what was reviewed, against what, and what was deliberately left out.
+  </footer>
+</div>
+
+<script>
+// Filtering is an enhancement: every finding is in the HTML and visible without it.
+const findings = [...document.querySelectorAll('.finding')];
+const chips = [...document.querySelectorAll('.chip')];
+const search = document.getElementById('q');
+const empty = document.getElementById('empty');
+let severity = 'all';
+
+function apply() {
+  const needle = search.value.trim().toLowerCase();
+  let shown = 0;
+  for (const item of findings) {
+    const bySeverity = severity === 'all' || item.dataset.severity === severity;
+    const byText = !needle || item.textContent.toLowerCase().includes(needle);
+    const show = bySeverity && byText;
+    item.hidden = !show;
+    if (show) shown++;
+  }
+  empty.classList.toggle('hidden', shown > 0);
+}
+
+for (const chip of chips) {
+  chip.addEventListener('click', () => {
+    severity = chip.dataset.filter;
+    for (const c of chips) c.setAttribute('aria-pressed', String(c === chip));
+    apply();
+  });
+}
+search.addEventListener('input', apply);
+
+// "/" focuses the filter, Escape clears it.
+addEventListener('keydown', e => {
+  if (e.key === '/' && document.activeElement !== search) { e.preventDefault(); search.focus(); }
+  if (e.key === 'Escape' && document.activeElement === search) { search.value = ''; apply(); search.blur(); }
+});
+
+document.getElementById('theme-toggle')?.addEventListener('click', () => {
+  const dark = document.documentElement.classList.toggle('dark');
+  try { localStorage.setItem('theme', dark ? 'dark' : 'light'); } catch (e) {}
+});
+
+// ── Syntax highlighting ───────────────────────────────────────────────────
+// Add a language to SYNTAX to support it; anything unlisted renders plain.
+// report.html carries the same block plus diff tinting.
+const SYNTAX = {
+  go:   { cm: /\/\/[^\n]*|\/\*[\s\S]*?\*\//, kw: 'break case chan const continue default defer else fallthrough for func go goto if import interface map package range return select struct switch type var nil true false' },
+  js:   { cm: /\/\/[^\n]*|\/\*[\s\S]*?\*\//, kw: 'async await break case catch class const continue default delete do else export extends finally for from function if import in instanceof let new of return super switch this throw try typeof var void while yield null true false undefined' },
+  ts:   { cm: /\/\/[^\n]*|\/\*[\s\S]*?\*\//, kw: 'async await break case catch class const continue declare default delete do else enum export extends finally for from function if implements import in infer instanceof interface keyof let new of readonly return satisfies super switch this throw try type typeof var void while yield null true false undefined' },
+  py:   { cm: /#[^\n]*/, kw: 'and as assert async await break class continue def del elif else except finally for from global if import in is lambda None nonlocal not or pass raise return try while with yield True False' },
+  sh:   { cm: /#[^\n]*/, kw: 'if then elif else fi for while until do done case esac function return export local readonly shift source trap set' },
+  sql:  { cm: /--[^\n]*|\/\*[\s\S]*?\*\//, kw: 'select from where join left right inner outer full on group by order having limit offset union all insert into values update set delete create alter drop table index view as and or not null is distinct count sum avg min max case when then else end' },
+  json: { cm: null, kw: 'true false null' },
+};
+const RX_STR = /"(?:\\.|[^"\\])*"|'(?:\\.|[^'\\])*'|`(?:\\.|[^`\\])*`/;
+const RX_NUM = /\b0[xX][0-9a-fA-F]+\b|\b\d[\d_]*(?:\.\d+)?\b/;
+const RX_FN  = /\b[A-Za-z_]\w*(?=\()/;
+const esc = s => s.replace(/[&<>]/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;' })[c]);
+
+for (const pre of document.querySelectorAll('pre[data-lang]')) {
+  const g = SYNTAX[pre.dataset.lang];
+  if (!g) continue;
+  const rx = new RegExp([
+    g.cm && `(?<cm>${g.cm.source})`,
+    `(?<str>${RX_STR.source})`,
+    `(?<num>${RX_NUM.source})`,
+    `(?<kw>\\b(?:${g.kw.split(' ').join('|')})\\b)`,
+    `(?<fn>${RX_FN.source})`,
+  ].filter(Boolean).join('|'), 'g');
+  const code = pre.querySelector('code') ?? pre;
+  const text = code.textContent;
+  let out = '', last = 0;
+  for (const m of text.matchAll(rx)) {
+    const [kind, value] = Object.entries(m.groups).find(([, v]) => v !== undefined);
+    out += esc(text.slice(last, m.index)) + `<span class="t-${kind}">${esc(value)}</span>`;
+    last = m.index + m[0].length;
+  }
+  code.innerHTML = out + esc(text.slice(last));
+}
+</script>
+</body>
+</html>

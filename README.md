@@ -116,14 +116,15 @@ To persist the settings instead of exporting them every session, put them in
 
 ## Using it from an agent
 
-The [`skills/`](skills/) directory contains a drop-in skill that teaches an agent
-when and how to publish. For Claude Code:
+The [`skills/`](skills/) directory contains two drop-in skills: `hostebin` teaches
+an agent when and how to publish, and `beautiful-html` teaches it to write a page
+worth reading first. For Claude Code:
 
 ```sh
-mkdir -p ~/.claude/skills && cp -r skills/hostebin ~/.claude/skills/
+mkdir -p ~/.claude/skills && cp -r skills/hostebin skills/beautiful-html ~/.claude/skills/
 ```
 
-For any other agent, `skills/hostebin/SKILL.md` is plain Markdown — append it to
+For any other agent, both `SKILL.md` files are plain Markdown — append them to
 `AGENTS.md` or your system prompt.
 
 The contract that makes this safe to script:

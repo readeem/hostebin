@@ -86,11 +86,11 @@ gets squeezed to nothing.
 
 ```html
 <div class="grid gap-4 md:grid-cols-2">
-  <div class="rounded-lg border border-line bg-surface">
+  <div class="rounded-xl border border-line bg-surface">
     <p class="border-b border-line px-4 py-2 text-xs font-semibold tracking-wide text-muted uppercase">Before</p>
     <pre class="overflow-x-auto px-4 py-3 font-mono text-xs/6"><code>old</code></pre>
   </div>
-  <div class="rounded-lg border border-line bg-surface">
+  <div class="rounded-xl border border-line bg-surface">
     <p class="border-b border-line px-4 py-2 text-xs font-semibold tracking-wide text-muted uppercase">After</p>
     <pre class="overflow-x-auto px-4 py-3 font-mono text-xs/6"><code>new</code></pre>
   </div>
@@ -99,11 +99,14 @@ gets squeezed to nothing.
 
 ## Diff
 
-Added and removed lines, tinted rather than coloured — the text stays `ink` so it
-is still comfortable to read.
+Paste the raw patch and let the highlighter tint it; see *Code and diffs* in
+`SKILL.md`, and copy the script from `templates/report.html`.
 
 ```html
-<pre class="overflow-x-auto rounded-lg border border-line bg-code py-3 font-mono text-xs/6"><code><span class="block px-4">  func serve() {</span><span class="block bg-bad-soft px-4 text-ink">-   log.Print("v1")</span><span class="block bg-ok-soft px-4 text-ink">+   log.Print("v2")</span><span class="block px-4">  }</span></code></pre>
+<pre data-lang="go" data-diff class="overflow-x-auto py-3.5 font-mono text-xs/6"><code>@@ -12,3 +12,3 @@
+ 	func serve() {
+-		log.Print("v1")
++		log.Print("v2")</code></pre>
 ```
 
 ## Figure
@@ -114,7 +117,7 @@ the caption says what to look at.
 ```html
 <figure class="my-6">
   <img src="chart.png" alt="Describe what the image shows, not that it is an image."
-       class="max-w-full rounded-lg border border-line">
+       class="max-w-full rounded-xl border border-line">
   <figcaption class="mt-2 text-sm text-muted">What the reader should notice in it.</figcaption>
 </figure>
 ```
@@ -127,7 +130,7 @@ Upload the image alongside the page so the relative path resolves:
 Shown when a filter or a query matches nothing. Say what would fill it.
 
 ```html
-<p class="rounded-lg border border-dashed border-line px-4 py-10 text-center text-sm text-muted">
+<p class="rounded-xl border border-dashed border-line px-4 py-10 text-center text-sm text-muted">
   No findings at this severity.
 </p>
 ```
@@ -137,7 +140,7 @@ Shown when a filter or a query matches nothing. Say what would fill it.
 For tables long enough to scroll past their own header.
 
 ```html
-<div class="max-h-[70vh] overflow-auto rounded-lg border border-line">
+<div class="max-h-[70vh] overflow-auto rounded-xl border border-line">
   <table class="w-full border-collapse text-sm">
     <thead class="sticky top-0 bg-surface text-left shadow-[0_1px_0_var(--line)]">
       <tr><th class="px-4 py-2.5 font-semibold">Name</th></tr>
