@@ -15,6 +15,7 @@
 <link rel="preconnect" href="https://fonts.googleapis.com"><link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link href="https://fonts.googleapis.com/css2?family=DM+Sans:opsz,wght@9..40,400;9..40,500;9..40,600;9..40,700&family=JetBrains+Mono:wght@400;500&display=swap" rel="stylesheet">
 <script src="https://cdn.jsdelivr.net/npm/@tailwindcss/browser@4"></script>
+<script src="https://cdn.jsdelivr.net/gh/highlightjs/cdn-release@11.11.1/build/highlight.min.js" defer></script>
 <style type="text/tailwindcss">
 @custom-variant dark (&:where(.dark, .dark *));
 
@@ -69,15 +70,17 @@
   .prose-body strong { @apply font-semibold text-ink; }
   .prose-body code { @apply rounded-md bg-code px-1.5 py-0.5 font-mono text-[0.85em] text-ink; }
 
-  /* Written by the highlighter at the end of <body>. */
-  .t-cm { color: var(--t-cm); } .t-str { color: var(--t-str); }
-  .t-num { color: var(--t-num); } .t-kw { color: var(--t-kw); }
-  .t-fn { color: var(--t-fn); }
-
-  .dl { @apply block w-max min-w-full px-4; }
-  .dl.add { background: color-mix(in oklab, var(--ok) 14%, transparent); }
-  .dl.del { background: color-mix(in oklab, var(--bad) 14%, transparent); }
-  .dl.hunk { color: var(--muted); background: color-mix(in oklab, var(--ink) 7%, transparent); }
+  .hljs { color: var(--ink); background: transparent; }
+  .hljs-comment, .hljs-quote { color: var(--t-cm); }
+  .hljs-string, .hljs-regexp, .hljs-symbol, .hljs-bullet { color: var(--t-str); }
+  .hljs-number, .hljs-literal { color: var(--t-num); }
+  .hljs-keyword, .hljs-selector-tag, .hljs-type { color: var(--t-kw); }
+  .hljs-title, .hljs-section, .hljs-function .hljs-title { color: var(--t-fn); }
+  .language-diff.hljs { @apply block w-max min-w-full px-4; }
+  .language-diff .hljs-addition, .language-diff .hljs-deletion, .language-diff .hljs-meta { @apply -mx-4 block px-4; }
+  .language-diff .hljs-addition { color: inherit; background: color-mix(in oklab, var(--ok) 14%, transparent); }
+  .language-diff .hljs-deletion { color: inherit; background: color-mix(in oklab, var(--bad) 14%, transparent); }
+  .language-diff .hljs-meta { color: var(--muted); background: color-mix(in oklab, var(--ink) 7%, transparent); }
 }
 
 @media print {
@@ -87,8 +90,8 @@
     --t-cm: #767676; --t-str: #1a1a1a; --t-num: #1a1a1a; --t-kw: #000; --t-fn: #333;
   }
   .no-print { display: none !important; }
-  .t-kw { font-weight: 600; }
-  .dl.add, .dl.del { background: #f0f0f0; }
+  .hljs-keyword { font-weight: 600; }
+  .language-diff .hljs-addition, .language-diff .hljs-deletion { background: #f0f0f0; }
   a[href^="http"]::after { content: " (" attr(href) ")"; font-size: 0.75em; word-break: break-all; }
 }
 </style>
@@ -213,7 +216,7 @@
           </ol>
         </div>
 
-        <!-- Diff: paste the patch as text and add data-diff. -->
+        <!-- Diff: paste the raw patch into a language-diff code block. -->
         <figure class="group relative my-6 overflow-hidden rounded-xl border border-line bg-surface">
           <figcaption class="flex items-center justify-between border-b border-line px-4 py-2.5 font-mono text-[0.75rem] text-muted">
             <span>REPLACE: path/to/file.go</span>
@@ -221,14 +224,14 @@
               <svg class="icon size-3.5" aria-hidden="true"><use href="#i-copy"/></svg><span class="copy-label">Copy</span>
             </button>
           </figcaption>
-          <pre data-lang="go" data-diff class="overflow-x-auto py-3.5 font-mono text-[0.8rem]/6"><code>@@ -218,7 +218,7 @@ func (s *Server) createBundle(w http.ResponseWriter, r *http.Request) {
+          <pre class="overflow-x-auto py-3.5 font-mono text-[0.8rem]/6"><code class="language-diff">@@ -218,7 +218,7 @@ func (s *Server) createBundle(w http.ResponseWriter, r *http.Request) {
  	ttl, err := ParseDuration(raw)
 -	exp := now.Add(ttl).Truncate(24 * time.Hour)
 +	exp := now.Add(ttl)
  	meta.ExpiresAt = &amp;exp</code></pre>
         </figure>
 
-        <!-- Snippet: data-lang alone. go, js, ts, py, sh, sql, json. -->
+        <!-- Snippet: use Highlight.js's language-* class for explicit detection. -->
         <figure class="group relative my-6 overflow-hidden rounded-xl border border-line bg-surface">
           <figcaption class="flex items-center justify-between border-b border-line px-4 py-2.5 font-mono text-[0.75rem] text-muted">
             <span>REPLACE: path/to/file.go</span>
@@ -236,7 +239,7 @@
               <svg class="icon size-3.5" aria-hidden="true"><use href="#i-copy"/></svg><span class="copy-label">Copy</span>
             </button>
           </figcaption>
-          <pre data-lang="go" class="overflow-x-auto px-4 py-3.5 font-mono text-[0.8rem]/6"><code>// REPLACE: the smallest snippet that makes the point.
+          <pre class="overflow-x-auto px-4 py-3.5 font-mono text-[0.8rem]/6"><code class="language-go">// REPLACE: the smallest snippet that makes the point.
 func (s *Store) Backfill(ctx context.Context) (int, error) {
 	n := 0
 	for _, m := range s.Live() {
@@ -283,66 +286,7 @@ document.getElementById('theme-toggle')?.addEventListener('click', () => {
   try { localStorage.setItem('theme', dark ? 'dark' : 'light'); } catch (e) {}
 });
 
-// ── Syntax and diff highlighting ──────────────────────────────────────────
-// Add a language to SYNTAX to support it; anything unlisted renders plain.
-const SYNTAX = {
-  go:   { cm: /\/\/[^\n]*|\/\*[\s\S]*?\*\//, kw: 'break case chan const continue default defer else fallthrough for func go goto if import interface map package range return select struct switch type var nil true false' },
-  js:   { cm: /\/\/[^\n]*|\/\*[\s\S]*?\*\//, kw: 'async await break case catch class const continue default delete do else export extends finally for from function if import in instanceof let new of return super switch this throw try typeof var void while yield null true false undefined' },
-  ts:   { cm: /\/\/[^\n]*|\/\*[\s\S]*?\*\//, kw: 'async await break case catch class const continue declare default delete do else enum export extends finally for from function if implements import in infer instanceof interface keyof let new of readonly return satisfies super switch this throw try type typeof var void while yield null true false undefined' },
-  py:   { cm: /#[^\n]*/, kw: 'and as assert async await break class continue def del elif else except finally for from global if import in is lambda None nonlocal not or pass raise return try while with yield True False' },
-  sh:   { cm: /#[^\n]*/, kw: 'if then elif else fi for while until do done case esac function return export local readonly shift source trap set' },
-  sql:  { cm: /--[^\n]*|\/\*[\s\S]*?\*\//, kw: 'select from where join left right inner outer full on group by order having limit offset union all insert into values update set delete create alter drop table index view as and or not null is distinct count sum avg min max case when then else end' },
-  json: { cm: null, kw: 'true false null' },
-};
-const RX_STR = /"(?:\\.|[^"\\])*"|'(?:\\.|[^'\\])*'|`(?:\\.|[^`\\])*`/;
-const RX_NUM = /\b0[xX][0-9a-fA-F]+\b|\b\d[\d_]*(?:\.\d+)?\b/;
-const RX_FN  = /\b[A-Za-z_]\w*(?=\()/;
-const esc = s => s.replace(/[&<>]/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;' })[c]);
-
-// Keywords run before function names so `if (` reads as a keyword, not a call.
-const rules = new Map();
-function rule(lang) {
-  if (!rules.has(lang)) {
-    const g = SYNTAX[lang];
-    rules.set(lang, !g ? null : new RegExp([
-      g.cm && `(?<cm>${g.cm.source})`,
-      `(?<str>${RX_STR.source})`,
-      `(?<num>${RX_NUM.source})`,
-      `(?<kw>\\b(?:${g.kw.split(' ').join('|')})\\b)`,
-      `(?<fn>${RX_FN.source})`,
-    ].filter(Boolean).join('|'), 'g'));
-  }
-  return rules.get(lang);
-}
-
-function highlight(text, lang) {
-  const rx = rule(lang);
-  if (!rx) return esc(text);
-  let out = '', last = 0;
-  for (const m of text.matchAll(rx)) {
-    const [kind, value] = Object.entries(m.groups).find(([, v]) => v !== undefined);
-    out += esc(text.slice(last, m.index)) + `<span class="t-${kind}">${esc(value)}</span>`;
-    last = m.index + m[0].length;
-  }
-  return out + esc(text.slice(last));
-}
-
-// A diff line's state is its first character: + added, - removed, @ hunk header.
-const DIFF = { '+': 'add', '-': 'del', '@': 'hunk' };
-
-for (const pre of document.querySelectorAll('pre[data-lang]')) {
-  const code = pre.querySelector('code') ?? pre;
-  const lang = pre.dataset.lang;
-  if (pre.hasAttribute('data-diff')) {
-    code.innerHTML = code.textContent.split('\n').map(line => {
-      const state = DIFF[line[0]] ?? 'ctx';
-      const body = state === 'hunk' ? esc(line) : esc(line.slice(0, 1)) + highlight(line.slice(1), lang);
-      return `<span class="dl ${state}">${body || '&nbsp;'}</span>`;
-    }).join('');
-  } else {
-    code.innerHTML = highlight(code.textContent, lang);
-  }
-}
+addEventListener('DOMContentLoaded', () => globalThis.hljs?.highlightAll());
 
 // Copy code. Swapping the <use> href rather than textContent keeps the icon.
 for (const btn of document.querySelectorAll('.copy-btn')) {
@@ -353,7 +297,7 @@ for (const btn of document.querySelectorAll('.copy-btn')) {
     const code = btn.closest('figure')?.querySelector('code');
     if (!code) return;
     try {
-      await navigator.clipboard.writeText(code.innerText);
+      await navigator.clipboard.writeText(code.textContent);
       set('#i-check', 'Copied');
       setTimeout(() => set('#i-copy', 'Copy'), 1200);
     } catch (e) { set('#i-copy', 'Press ⌘C'); }

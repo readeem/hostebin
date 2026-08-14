@@ -15,6 +15,7 @@
 <link rel="preconnect" href="https://fonts.googleapis.com"><link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link href="https://fonts.googleapis.com/css2?family=DM+Sans:opsz,wght@9..40,400;9..40,500;9..40,600;9..40,700&family=JetBrains+Mono:wght@400;500&display=swap" rel="stylesheet">
 <script src="https://cdn.jsdelivr.net/npm/@tailwindcss/browser@4"></script>
+<script src="https://cdn.jsdelivr.net/gh/highlightjs/cdn-release@11.11.1/build/highlight.min.js" defer></script>
 <style type="text/tailwindcss">
 @custom-variant dark (&:where(.dark, .dark *));
 
@@ -68,9 +69,12 @@
   .chip { @apply cursor-pointer rounded-full border border-line px-3 py-1 text-sm text-muted transition hover:text-ink; }
   .chip[aria-pressed="true"] { @apply border-accent bg-accent-soft font-medium text-accent; }
 
-  .t-cm { color: var(--t-cm); } .t-str { color: var(--t-str); }
-  .t-num { color: var(--t-num); } .t-kw { color: var(--t-kw); }
-  .t-fn { color: var(--t-fn); }
+  .hljs { color: var(--ink); background: transparent; }
+  .hljs-comment, .hljs-quote { color: var(--t-cm); }
+  .hljs-string, .hljs-regexp, .hljs-symbol, .hljs-bullet { color: var(--t-str); }
+  .hljs-number, .hljs-literal { color: var(--t-num); }
+  .hljs-keyword, .hljs-selector-tag, .hljs-type { color: var(--t-kw); }
+  .hljs-title, .hljs-section, .hljs-function .hljs-title { color: var(--t-fn); }
 }
 
 @media print {
@@ -163,7 +167,7 @@
             <p class="mt-2 text-sm/6 text-ink/90">
               REPLACE: concrete inputs or state, then the wrong output or crash they produce.
             </p>
-            <pre data-lang="go" class="mt-3 overflow-x-auto rounded-lg bg-code px-3 py-2.5 font-mono text-xs/6"><code>exp := now.Add(ttl).Truncate(24 * time.Hour) // REPLACE</code></pre>
+            <pre class="mt-3 overflow-x-auto rounded-lg bg-code px-3 py-2.5 font-mono text-xs/6"><code class="language-go">exp := now.Add(ttl).Truncate(24 * time.Hour) // REPLACE</code></pre>
           </details>
         </div>
       </article>
@@ -267,43 +271,7 @@ document.getElementById('theme-toggle')?.addEventListener('click', () => {
   try { localStorage.setItem('theme', dark ? 'dark' : 'light'); } catch (e) {}
 });
 
-// ── Syntax highlighting ───────────────────────────────────────────────────
-// Add a language to SYNTAX to support it; anything unlisted renders plain.
-// report.html carries the same block plus diff tinting.
-const SYNTAX = {
-  go:   { cm: /\/\/[^\n]*|\/\*[\s\S]*?\*\//, kw: 'break case chan const continue default defer else fallthrough for func go goto if import interface map package range return select struct switch type var nil true false' },
-  js:   { cm: /\/\/[^\n]*|\/\*[\s\S]*?\*\//, kw: 'async await break case catch class const continue default delete do else export extends finally for from function if import in instanceof let new of return super switch this throw try typeof var void while yield null true false undefined' },
-  ts:   { cm: /\/\/[^\n]*|\/\*[\s\S]*?\*\//, kw: 'async await break case catch class const continue declare default delete do else enum export extends finally for from function if implements import in infer instanceof interface keyof let new of readonly return satisfies super switch this throw try type typeof var void while yield null true false undefined' },
-  py:   { cm: /#[^\n]*/, kw: 'and as assert async await break class continue def del elif else except finally for from global if import in is lambda None nonlocal not or pass raise return try while with yield True False' },
-  sh:   { cm: /#[^\n]*/, kw: 'if then elif else fi for while until do done case esac function return export local readonly shift source trap set' },
-  sql:  { cm: /--[^\n]*|\/\*[\s\S]*?\*\//, kw: 'select from where join left right inner outer full on group by order having limit offset union all insert into values update set delete create alter drop table index view as and or not null is distinct count sum avg min max case when then else end' },
-  json: { cm: null, kw: 'true false null' },
-};
-const RX_STR = /"(?:\\.|[^"\\])*"|'(?:\\.|[^'\\])*'|`(?:\\.|[^`\\])*`/;
-const RX_NUM = /\b0[xX][0-9a-fA-F]+\b|\b\d[\d_]*(?:\.\d+)?\b/;
-const RX_FN  = /\b[A-Za-z_]\w*(?=\()/;
-const esc = s => s.replace(/[&<>]/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;' })[c]);
-
-for (const pre of document.querySelectorAll('pre[data-lang]')) {
-  const g = SYNTAX[pre.dataset.lang];
-  if (!g) continue;
-  const rx = new RegExp([
-    g.cm && `(?<cm>${g.cm.source})`,
-    `(?<str>${RX_STR.source})`,
-    `(?<num>${RX_NUM.source})`,
-    `(?<kw>\\b(?:${g.kw.split(' ').join('|')})\\b)`,
-    `(?<fn>${RX_FN.source})`,
-  ].filter(Boolean).join('|'), 'g');
-  const code = pre.querySelector('code') ?? pre;
-  const text = code.textContent;
-  let out = '', last = 0;
-  for (const m of text.matchAll(rx)) {
-    const [kind, value] = Object.entries(m.groups).find(([, v]) => v !== undefined);
-    out += esc(text.slice(last, m.index)) + `<span class="t-${kind}">${esc(value)}</span>`;
-    last = m.index + m[0].length;
-  }
-  code.innerHTML = out + esc(text.slice(last));
-}
+addEventListener('DOMContentLoaded', () => globalThis.hljs?.highlightAll());
 </script>
 </body>
 </html>

@@ -15,6 +15,7 @@
 <link rel="preconnect" href="https://fonts.googleapis.com"><link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link href="https://fonts.googleapis.com/css2?family=DM+Sans:opsz,wght@9..40,400;9..40,500;9..40,600;9..40,700&family=JetBrains+Mono:wght@400;500&display=swap" rel="stylesheet">
 <script src="https://cdn.jsdelivr.net/npm/@tailwindcss/browser@4"></script>
+<script src="https://cdn.jsdelivr.net/gh/highlightjs/cdn-release@11.11.1/build/highlight.min.js" defer></script>
 <style type="text/tailwindcss">
 @custom-variant dark (&:where(.dark, .dark *));
 
@@ -69,15 +70,17 @@
   .prose-body strong { @apply font-semibold text-ink; }
   .prose-body code { @apply rounded-md bg-code px-1.5 py-0.5 font-mono text-[0.85em] text-ink; }
 
-  /* Written by the highlighter at the end of <body>. */
-  .t-cm { color: var(--t-cm); } .t-str { color: var(--t-str); }
-  .t-num { color: var(--t-num); } .t-kw { color: var(--t-kw); }
-  .t-fn { color: var(--t-fn); }
-
-  .dl { @apply block w-max min-w-full px-4; }
-  .dl.add { background: color-mix(in oklab, var(--ok) 14%, transparent); }
-  .dl.del { background: color-mix(in oklab, var(--bad) 14%, transparent); }
-  .dl.hunk { color: var(--muted); background: color-mix(in oklab, var(--ink) 7%, transparent); }
+  .hljs { color: var(--ink); background: transparent; }
+  .hljs-comment, .hljs-quote { color: var(--t-cm); }
+  .hljs-string, .hljs-regexp, .hljs-symbol, .hljs-bullet { color: var(--t-str); }
+  .hljs-number, .hljs-literal { color: var(--t-num); }
+  .hljs-keyword, .hljs-selector-tag, .hljs-type { color: var(--t-kw); }
+  .hljs-title, .hljs-section, .hljs-function .hljs-title { color: var(--t-fn); }
+  .language-diff.hljs { @apply block w-max min-w-full px-4; }
+  .language-diff .hljs-addition, .language-diff .hljs-deletion, .language-diff .hljs-meta { @apply -mx-4 block px-4; }
+  .language-diff .hljs-addition { color: inherit; background: color-mix(in oklab, var(--ok) 14%, transparent); }
+  .language-diff .hljs-deletion { color: inherit; background: color-mix(in oklab, var(--bad) 14%, transparent); }
+  .language-diff .hljs-meta { color: var(--muted); background: color-mix(in oklab, var(--ink) 7%, transparent); }
 }
 
 @media print {
@@ -87,8 +90,8 @@
     --t-cm: #767676; --t-str: #1a1a1a; --t-num: #1a1a1a; --t-kw: #000; --t-fn: #333;
   }
   .no-print { display: none !important; }
-  .t-kw { font-weight: 600; }
-  .dl.add, .dl.del { background: #f0f0f0; }
+  .hljs-keyword { font-weight: 600; }
+  .language-diff .hljs-addition, .language-diff .hljs-deletion { background: #f0f0f0; }
 }
 </style>
 </head>
@@ -134,7 +137,7 @@ document.getElementById('theme-toggle')?.addEventListener('click', () => {
   const dark = document.documentElement.classList.toggle('dark');
   try { localStorage.setItem('theme', dark ? 'dark' : 'light'); } catch (e) {}
 });
-// Code blocks need the highlighter from report.html; copy it across with them.
+addEventListener('DOMContentLoaded', () => globalThis.hljs?.highlightAll());
 </script>
 </body>
 </html>

@@ -8,6 +8,9 @@ description: Design HTML pages worth reading — reports, plans, research writeu
 A page built from these parts reads well in both themes, prints, and survives a
 dead CDN. Publish the finished file with the `hostebin` skill.
 
+When using a template, you generally don't need to verify the HTML. Once `hostebin`
+returns a URL, report it without reopening it; a sound local page is sufficient.
+
 ## Start from a template
 
 Copy the closest one out of `templates/` next to this file into a scratch path
@@ -39,6 +42,9 @@ Paste it verbatim; the pieces depend on each other.
 - **Tailwind v4 loads from `cdn.jsdelivr.net`.** hostebin's default CSP allows
   `https:` scripts, so it compiles in the browser with no build step. When the CDN
   is slow the page holds the fallback style below until it answers.
+- **Highlight.js 11.11.1 loads from `cdn.jsdelivr.net`.** It highlights explicit
+  `language-*` code blocks after the document parses; code stays readable if it
+  never loads.
 - **DM Sans and JetBrains Mono load from Google Fonts**, mapped to `--font-sans`
   and `--font-mono`. Both degrade to system faces.
 - **`connect-src` is `'self' https:`.** A page *may* fetch from an HTTPS origin at
@@ -53,7 +59,7 @@ Paste it verbatim; the pieces depend on each other.
   work.
 - **The `.icon` rule** in `@layer components` is the only place icon size, stroke,
   and alignment are set, so every `<use href="#i-…">` on the page matches.
-- **The `.t-*` and `.dl` rules** colour code and diffs — see *Code and diffs*.
+- **The `.hljs-*` rules** colour code and diffs — see *Code and diffs*.
 
 ## Tokens
 
@@ -112,29 +118,27 @@ needs a second hue usually wanted to be a table.
 
 ## Code and diffs
 
-`report.html` carries a 45-line highlighter at the end of `<body>`, and
-`findings.html` a syntax-only cut of it. Copy one across with any code you paste.
-It runs once at load and marks up two attributes:
+`report.html` and `findings.html` load Highlight.js 11.11.1 from jsDelivr. Copy
+the CDN script and local `.hljs-*` theme rules across with any code you paste,
+then use the standard `language-*` class on `<code>`:
 
 ```html
-<pre data-lang="go">          <code>func main() { … }</code></pre>
-<pre data-lang="go" data-diff><code>@@ -218,7 +218,7 @@
+<pre><code class="language-go">func main() { … }</code></pre>
+<pre><code class="language-diff">@@ -218,7 +218,7 @@
 -	exp := now.Add(ttl).Truncate(24 * time.Hour)
 +	exp := now.Add(ttl)</code></pre>
 ```
 
-- **`data-lang`** colours comments, strings, numbers, keywords and call names into
-  the five `--t-*` tokens. `go`, `js`, `ts`, `py`, `sh`, `sql` and `json` ship;
-  add a language by adding one line to the `SYNTAX` table. Anything unlisted
-  renders plain rather than wrong.
-- **`data-diff`** takes a raw patch as text and tints each line from its first
-  character: `+` green, `-` red, `@@` a muted hunk header. No per-line markup, and
-  the markers stay in the text, so copying gives back a real patch.
+- **`language-*`** chooses a grammar explicitly: `language-go`, `language-ts`,
+  `language-python`, `language-bash`, `language-sql`, `language-json`, and so on.
+  The CDN build carries Highlight.js's common languages; consult its supported
+  language list for names and aliases.
+- **`language-diff`** tints `+` lines green, `-` lines red, and `@@` hunk headers
+  muted. The markers stay in the text, so copying gives back a real patch.
 - **The tint spans the scroll width**, not the visible box, which is what
-  `w-max min-w-full` on `.dl` buys.
-- **Both are enhancements.** Delete the script and code is still readable
-  monospace. That is the reason it is inline rather than a highlighter CDN: code is
-  content, and content should not wait on a network round trip.
+  `w-max min-w-full` on `.language-diff.hljs` buys.
+- **Highlighting is an enhancement.** If the CDN fails, code remains readable
+  monospace and copying still returns the original text.
 - Escape `<`, `>` and `&` inside `<pre>` as you would anywhere else.
 
 ## Live data
@@ -218,7 +222,7 @@ Worth writing: theme toggle, syntax and diff highlighting, copy-to-clipboard,
 filter and search, sortable table, scroll-spy contents, `<details>` disclosure,
 back-to-top. Reach past those and the page has stopped being a document.
 
-- One `<script>` at the end of `<body>`, plain DOM, no framework.
+- One custom `<script>` at the end of `<body>`, plain DOM, no framework.
 - Guard every lookup: `document.getElementById('x')?.addEventListener(...)`.
 - **Name top-level variables distinctly** — `toTop`, not `top`. A top-level
   `const top` collides with the non-configurable `window.top` and throws before a

@@ -15,6 +15,7 @@
 <link rel="preconnect" href="https://fonts.googleapis.com"><link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link href="https://fonts.googleapis.com/css2?family=DM+Sans:opsz,wght@9..40,400;9..40,500;9..40,600;9..40,700&family=JetBrains+Mono:wght@400;500&display=swap" rel="stylesheet">
 <script src="https://cdn.jsdelivr.net/npm/@tailwindcss/browser@4"></script>
+<script src="https://cdn.jsdelivr.net/gh/highlightjs/cdn-release@11.11.1/build/highlight.min.js" defer></script>
 <style type="text/tailwindcss">
 @custom-variant dark (&:where(.dark, .dark *));
 
@@ -25,6 +26,8 @@
   --code: color-mix(in oklab, #000 4%, transparent);
   --accent: oklch(48.8% .217 264);
   --ok: #059669;      --warn: #b45309;   --bad: #b91c1c;
+  --t-cm: #7a7a7a;    --t-str: #047857;  --t-num: #b45309;
+  --t-kw: #7c3aed;    --t-fn: #2563eb;
 }
 .dark {
   --canvas: #000000;  --surface: color-mix(in oklab, #fff 5%, #000);
@@ -33,6 +36,8 @@
   --code: color-mix(in oklab, #fff 5%, transparent);
   --accent: oklch(65% .21 264);
   --ok: #34d399;      --warn: #fbbf24;   --bad: #fb414a;
+  --t-cm: #6f6f6f;    --t-str: #34d399;  --t-num: #fbbf24;
+  --t-kw: #b48cff;    --t-fn: #7aa2ff;
 }
 :root, .dark {
   --accent-soft: color-mix(in oklab, var(--accent) 13%, transparent);
@@ -61,14 +66,29 @@
   .tile-label { @apply font-mono text-[0.7rem] tracking-wide text-muted uppercase; }
   .tile-value { @apply mt-1.5 text-3xl font-semibold tabular-nums text-ink; }
   th[data-sort] { @apply cursor-pointer select-none hover:text-ink; }
+
+  .hljs { color: var(--ink); background: transparent; }
+  .hljs-comment, .hljs-quote { color: var(--t-cm); }
+  .hljs-string, .hljs-regexp, .hljs-symbol, .hljs-bullet { color: var(--t-str); }
+  .hljs-number, .hljs-literal { color: var(--t-num); }
+  .hljs-keyword, .hljs-selector-tag, .hljs-type { color: var(--t-kw); }
+  .hljs-title, .hljs-section, .hljs-function .hljs-title { color: var(--t-fn); }
+  .language-diff.hljs { @apply block w-max min-w-full px-4; }
+  .language-diff .hljs-addition, .language-diff .hljs-deletion, .language-diff .hljs-meta { @apply -mx-4 block px-4; }
+  .language-diff .hljs-addition { color: inherit; background: color-mix(in oklab, var(--ok) 14%, transparent); }
+  .language-diff .hljs-deletion { color: inherit; background: color-mix(in oklab, var(--bad) 14%, transparent); }
+  .language-diff .hljs-meta { color: var(--muted); background: color-mix(in oklab, var(--ink) 7%, transparent); }
 }
 
 @media print {
   :root, .dark {
     --canvas: #fff; --surface: #fff; --ink: #000; --muted: #444;
     --line: #bbb; --code: #f2f2f2;
+    --t-cm: #767676; --t-str: #1a1a1a; --t-num: #1a1a1a; --t-kw: #000; --t-fn: #333;
   }
   .no-print { display: none !important; }
+  .hljs-keyword { font-weight: 600; }
+  .language-diff .hljs-addition, .language-diff .hljs-deletion { background: #f0f0f0; }
 }
 </style>
 </head>
@@ -274,6 +294,8 @@ document.getElementById('theme-toggle')?.addEventListener('click', () => {
   const dark = document.documentElement.classList.toggle('dark');
   try { localStorage.setItem('theme', dark ? 'dark' : 'light'); } catch (e) {}
 });
+
+addEventListener('DOMContentLoaded', () => globalThis.hljs?.highlightAll());
 </script>
 </body>
 </html>

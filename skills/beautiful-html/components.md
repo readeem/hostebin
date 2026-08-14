@@ -99,11 +99,11 @@ gets squeezed to nothing.
 
 ## Diff
 
-Paste the raw patch and let the highlighter tint it; see *Code and diffs* in
-`SKILL.md`, and copy the script from `templates/report.html`.
+Paste the raw patch and let Highlight.js tint it; see *Code and diffs* in
+`SKILL.md`, and include the CDN script from `templates/report.html`.
 
 ```html
-<pre data-lang="go" data-diff class="overflow-x-auto py-3.5 font-mono text-xs/6"><code>@@ -12,3 +12,3 @@
+<pre class="overflow-x-auto py-3.5 font-mono text-xs/6"><code class="language-diff">@@ -12,3 +12,3 @@
  	func serve() {
 -		log.Print("v1")
 +		log.Print("v2")</code></pre>
