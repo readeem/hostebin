@@ -1,13 +1,13 @@
 module github.com/readeem/hostebin
 
-go 1.26.5
+go 1.26.6
 
 require (
 	github.com/peterbourgon/ff/v3 v3.4.0
 	github.com/rs/zerolog v1.35.1
 	github.com/yuin/goldmark v1.8.5
 	golang.org/x/crypto v0.55.0
-	tailscale.com v1.102.2
+	tailscale.com v1.102.3
 )
 
 require (
