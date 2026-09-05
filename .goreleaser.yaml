@@ -70,7 +70,6 @@ archives:
     files:
       - README.md
       - LICENSE
-      - skills/README.md
       - skills/**/*
 
 checksum:

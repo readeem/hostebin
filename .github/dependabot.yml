@@ -25,3 +25,5 @@ updates:
       interval: weekly
     commit-message:
       prefix: "chore(docker)"
+    ignore:
+      - dependency-name: golang
