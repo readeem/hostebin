@@ -14,6 +14,7 @@ import (
 
 	"github.com/readeem/hostebin/internal/logging"
 	"github.com/readeem/hostebin/internal/store"
+	"github.com/readeem/hostebin/internal/theme"
 	"github.com/readeem/hostebin/internal/users"
 	"github.com/rs/zerolog"
 )
@@ -31,6 +32,7 @@ type Config struct {
 	DefaultTTL time.Duration
 	CSP        string
 	BundleHost string
+	Theme      theme.Source
 	Logger     *zerolog.Logger
 }
 
@@ -63,6 +65,9 @@ func New(cfg Config) (*Server, error) {
 		}
 		cfg.BundleHost = normalized
 	}
+	if cfg.Theme == nil {
+		cfg.Theme, _, _ = theme.Resolve("default")
+	}
 	if cfg.Logger == nil {
 		cfg.Logger = logging.NewConsole(os.Stderr)
 	}
@@ -88,6 +93,9 @@ func New(cfg Config) (*Server, error) {
 	mux.HandleFunc("PUT /api/v1/users/{id}/token", s.auth(s.rotateToken))
 	mux.HandleFunc("DELETE /api/v1/users/{id}/token", s.auth(s.revokeToken))
 	mux.HandleFunc("GET /b/{id}/{path...}", s.serveBundle)
+	mux.HandleFunc("GET "+ThemePath, func(w http.ResponseWriter, r *http.Request) { s.serveTheme(w, r, "") })
+	mux.HandleFunc("PUT /api/v1/users/{id}/theme", s.auth(s.setTheme))
+	mux.HandleFunc("DELETE /api/v1/users/{id}/theme", s.auth(s.removeTheme))
 
 	s.handler = http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		w.Header().Set("X-Content-Type-Options", "nosniff")

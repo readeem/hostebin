@@ -158,6 +158,8 @@ hostebin user ls|add|rm|disable|enable      manage users
 hostebin token new|rm                       rotate or revoke a token
 hostebin whoami [--json]                    show the current identity
 hostebin serve [flags]                      run the server
+hostebin theme [omarchy|FILE]               print a page theme
+hostebin theme set [omarchy|FILE] | rm      set or remove your page theme
 hostebin version                            version, commit, build date
 ```
 
@@ -241,7 +243,8 @@ names:
   "max-files": 64,
   "default-ttl": "never",
   "csp": "",
-  "bundle-host": ""
+  "bundle-host": "",
+  "theme": ""
 }
 ```
 
@@ -274,7 +277,8 @@ ACME use their known DNS names and other listeners derive links from the request
 a reverse proxy, forward the original `Host` and set `X-Forwarded-Proto`.
 
 Useful server settings: `--max-upload` (default `32MiB`), `--max-files` (default `64`),
-`--default-ttl` (default `never`), `--csp` (`off` disables it). Expired bundles 404
+`--default-ttl` (default `never`), `--csp` (`off` disables it), `--theme` (see
+[Themes](#themes)). Expired bundles 404
 immediately; a sweep at startup and every ten minutes reclaims their files.
 
 ### Path-based or host-based routing
@@ -416,6 +420,100 @@ HOSTEBIN_TS_AUTH_KEY=tskey-auth-... HOSTEBIN_TOKEN=choose-a-secret \
 Images are `CGO_ENABLED=0` on distroless nonroot, published for `linux/amd64` and
 `linux/arm64`. The Tailscale Compose service needs no elevated capabilities.
 
+## Themes
+
+Rendered Markdown, file listings, and every page that links
+`.hostebin/theme.css` take their colours from a theme. The
+[`beautiful-html`](skills/beautiful-html/) templates all link it. Each page gets
+the server's theme, then its owner's theme on top.
+
+### Your theme
+
+Every user can set their own, and it applies to every bundle they own:
+
+```sh
+hostebin theme set              # the active Omarchy theme on this machine
+hostebin theme set brand.css    # a theme file
+hostebin theme rm               # back to the server's theme
+```
+
+Admins can add `--user NAME` to change someone else's. Pages read the theme
+whenever they load, so a new theme restyles bundles that are already published.
+A page opened from disk, or published anywhere else, keeps the default colours
+it carries.
+
+A theme file is a `:root` block, and it only needs the tokens it changes:
+
+```css
+:root {
+  --accent: #3b82f6;
+}
+```
+
+`hostebin theme default` prints the full palette to start from. Surfaces,
+borders, and muted text are mixed from `--canvas` and `--ink`, so they follow on
+their own. A light theme sets `color-scheme: light` and dark enough status
+(`--ok`, `--warn`, `--bad`) and code (`--t-*`) colours. A theme file is used as
+written; only Omarchy themes are checked for contrast. Themes are limited to
+64 KiB and may not contain `<`.
+
+### Omarchy
+
+`hostebin theme` and `hostebin theme set` read the active theme from
+`~/.local/state/omarchy/current/theme/colors.toml`. They map its background,
+foreground, accent, and terminal colours onto pages, with two safeguards:
+
+- If the theme's red, yellow, or green isn't recognisably that colour, or its red
+  is the accent, the page keeps the built-in status colour. Monochrome themes would
+  otherwise mark failures in the same colour as links.
+- Text colours are lightened or darkened until they reach WCAG AA on every
+  background they appear on.
+
+To keep your pages in step with your desktop, re-send the theme on every switch
+with an Omarchy hook, `~/.config/omarchy/hooks/theme-set.d/50-hostebin` (make it
+executable):
+
+```bash
+#!/bin/bash
+exec hostebin theme set omarchy
+```
+
+### The server's theme
+
+`hostebin serve --theme` (`HOSTEBIN_THEME`, `"theme"` in the config file) sets
+the theme under everyone's, and is all that users without a theme of their own
+see:
+
+| `--theme` | Colours |
+| --- | --- |
+| unset | The active Omarchy theme when the server runs as an Omarchy user, otherwise the default |
+| `default` | The built-in near-black and crimson |
+| `omarchy` | The active Omarchy theme; startup fails without one |
+| `path/to/theme.css` | That file, layered over the default |
+
+The server rereads it on every request, so editing the file or switching the
+Omarchy theme needs no restart.
+
+### Setup prompt
+
+Paste this to your agent to set themes up for you:
+
+```text
+Set up my hostebin page theme. Read the "Themes" section of
+https://github.com/readeem/hostebin/blob/main/README.md first.
+
+1. Check that `hostebin whoami` works, so the client reaches my server.
+2. Check whether this machine runs Omarchy: ~/.local/state/omarchy/current/theme/colors.toml.
+3. On Omarchy: run `hostebin theme set`, then add the theme-set hook from the
+   README so every theme switch updates my pages. Switch nothing; show me the
+   output of `hostebin theme` and the hook instead.
+4. Not on Omarchy: ask me for an accent colour and whether I want light or dark,
+   write a theme file starting from `hostebin theme default`, and run
+   `hostebin theme set FILE`.
+5. Publish a small Markdown file with `hostebin up` and give me its URL so I can
+   see the result.
+```
+
 ## HTTP API
 
 All `/api/v1` routes require `Authorization: Bearer TOKEN`. Bundle content and
@@ -447,6 +545,10 @@ curl -sf -H "Authorization: Bearer $HOSTEBIN_TOKEN" \
 | `PUT /api/v1/users/{id}/token` | Atomically replace the user's token (admin or self) |
 | `DELETE /api/v1/users/{id}/token` | Revoke the user's token (admin or self) |
 | `GET /b/{id}/...` | Read public content; `?raw=1` disables Markdown rendering |
+| `PUT /api/v1/users/{id}/theme` | Set the user's page theme from a CSS body (admin or self) |
+| `DELETE /api/v1/users/{id}/theme` | Remove the user's page theme (admin or self) |
+| `GET /.hostebin/theme.css` | The server's theme |
+| `GET /b/{id}/.../.hostebin/theme.css` | The theme for this bundle: the server's, then its owner's |
 
 `PUT /api/v1/users/{id}/token` returns the replacement plaintext once. The previous
 token is invalid for the next request. Its `{label, ttl}` body is optional; sending no

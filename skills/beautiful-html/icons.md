@@ -47,7 +47,7 @@ one of them:
 ```
 
 `fill: none; stroke: currentColor` is what makes an icon inherit `text-bad` or
-`text-muted` from whatever it sits in, in both themes, with no per-icon colour.
+`text-muted` from whatever it sits in, with no per-icon colour.
 
 Use one:
 
@@ -111,8 +111,6 @@ Up is not automatically good. A latency chart that trends up gets
 ### Chrome
 
 ```html
-<symbol id="i-sun" viewBox="0 0 24 24"><circle cx="12" cy="12" r="4"/><path d="M12 2v2"/><path d="M12 20v2"/><path d="m4.93 4.93 1.41 1.41"/><path d="m17.66 17.66 1.41 1.41"/><path d="M2 12h2"/><path d="M20 12h2"/><path d="m6.34 17.66-1.41 1.41"/><path d="m19.07 4.93-1.41 1.41"/></symbol>
-<symbol id="i-moon" viewBox="0 0 24 24"><path d="M20.985 12.486a9 9 0 1 1-9.473-9.472c.405-.022.617.46.402.803a6 6 0 0 0 8.268 8.268c.344-.215.825-.004.803.401"/></symbol>
 <symbol id="i-copy" viewBox="0 0 24 24"><rect width="14" height="14" x="8" y="8" rx="2" ry="2"/><path d="M4 16c-1.1 0-2-.9-2-2V4c0-1.1.9-2 2-2h10c1.1 0 2 .9 2 2"/></symbol>
 <symbol id="i-check" viewBox="0 0 24 24"><path d="M20 6 9 17l-5-5"/></symbol>
 <symbol id="i-search" viewBox="0 0 24 24"><circle cx="11" cy="11" r="8"/><path d="m21 21-4.34-4.34"/></symbol>
@@ -139,7 +137,7 @@ Use one when it is the thing the eye searches for:
 
 - **Severity and status**, beside the word — badges, callouts, finding rails.
 - **Direction of change**, beside a delta — `+22%` reads faster with an arrow.
-- **The action a control performs** — copy, search, clear, back to top, theme.
+- **The action a control performs** — copy, search, clear, back to top.
 - **Disclosure state** — a chevron that rotates when a `<details>` opens.
 - **Sort state** on a table header.
 
@@ -207,12 +205,12 @@ very dark strokes disappear on one of them.
 The disclosure pattern, with no JavaScript:
 
 ```html
-<details class="group rounded-xl border border-line bg-surface px-4 py-3">
-  <summary class="flex cursor-pointer list-none items-center gap-2 text-sm font-medium select-none [&::-webkit-details-marker]:hidden">
-    <svg class="icon size-4 text-muted transition-transform group-open:rotate-90" aria-hidden="true"><use href="#i-chevron-right"/></svg>
+<details class="card group overflow-hidden">
+  <summary class="flex min-h-12 cursor-pointer list-none items-center gap-2 px-5 font-medium select-none hover:bg-raised [&::-webkit-details-marker]:hidden">
+    <svg class="icon text-muted transition-transform group-open:rotate-90" aria-hidden="true"><use href="#i-chevron-right"/></svg>
     Failure scenario
   </summary>
-  <div class="mt-3 border-t border-line pt-3 text-sm/6">Detail.</div>
+  <div class="border-t border-line px-5 py-4 text-[0.94rem]/relaxed">Detail.</div>
 </details>
 ```
 

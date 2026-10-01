@@ -5,8 +5,8 @@ description: Design HTML pages worth reading — reports, plans, research writeu
 
 # Beautiful HTML
 
-A page built from these parts reads well in both themes, prints, and survives a
-dead CDN. Publish the finished file with the `hostebin` skill.
+A page built from these parts reads well on a phone and a desktop, works from the
+keyboard, prints, and survives a dead CDN. Publish the finished file with the `hostebin` skill.
 
 When using a template, you generally don't need to verify the HTML. Once `hostebin`
 returns a URL, report it without reopening it; a sound local page is sufficient.
@@ -21,7 +21,7 @@ Copy the closest one out of `templates/` next to this file into a scratch path
 | `templates/report.html` | Plans, research, design docs, prose reviews — anything mostly read top to bottom. Sticky contents, callouts, code blocks, tables. |
 | `templates/findings.html` | Code review, audits, triage, test results — many small items with a severity and a location. Filter chips and text search. |
 | `templates/dashboard.html` | Benchmarks, log summaries, run statistics — headline numbers, a chart, and the table behind them. |
-| `templates/shell.html` | Anything else. The `<head>`, a header, and an empty body. |
+| `templates/shell.html` | Anything else. The `<head>`, the top bar, a hero, and an empty section. |
 
 Then work through it: replace the content, delete the sections you don't need, and
 pull anything extra from the two reference files next to this one —
@@ -34,8 +34,8 @@ in them lives here, so a template stays short enough to read in one pass.
 ## The shell
 
 Everything between `<head>` and `</head>` is the same in every template apart from
-the title, the favicon, and a few per-template component rules (`.tile`, `.chip`).
-Paste it verbatim; the pieces depend on each other.
+the title, the description, and the favicon. Paste it verbatim; the pieces depend
+on each other.
 
 - **The favicon is required.** See *Favicons* below — it is the one part of the
   shell that must change per page rather than be pasted unchanged.
@@ -49,66 +49,89 @@ Paste it verbatim; the pieces depend on each other.
   and `--font-mono`. Both degrade to system faces.
 - **`connect-src` is `'self' https:`.** A page *may* fetch from an HTTPS origin at
   runtime, so a live API is available — see *Live data* below.
-- **The pre-paint script** sets the theme class before the body renders, so the page
-  never flashes light before going dark. It is **dark unless the reader has chosen
-  light**, rather than following the system setting: these pages are dark-first.
-- **The inline base style** gives the page a background, colour, and font of its own,
-  so it stays readable in the moment before Tailwind compiles — and if the CDN never
+- **The publisher picks the colours.** The first `<style>` holds the default
+  palette, and the `<link>` after it loads `.hostebin/theme.css`: on a hostebin
+  server, the theme of whoever published the page. It may be light or dark. Opened from a
+  file, the link finds nothing and the defaults stay. Print switches to black on
+  white either way.
+- **The base style** also gives `html` a background, colour, and font, so the page
+  stays readable in the moment before Tailwind compiles — and if the CDN never
   answers at all.
-- **`@custom-variant dark`** makes dark mode a class, which is what lets the toggle
-  work.
-- **The `.icon` rule** in `@layer components` is the only place icon size, stroke,
-  and alignment are set, so every `<use href="#i-…">` on the page matches.
+- **`@layer base`** sets the focus ring, the scroll offset under the sticky bar,
+  and turns off smooth scrolling and transitions for readers who ask for reduced
+  motion.
+- **`@layer components`** holds the named parts every template uses: `.skip`,
+  `.wrap`, `.bar`, `.brand`, `.nav`, `.kicker`, `.h1`, `.lede`, `.stats`, `.h2`,
+  `.intro`, `.card`, `.prose-body`, `.chip`, `.tile`, `.table-wrap`, `.data`, and
+  `.icon`. Utilities do the rest. A rule here may only `@apply` utilities, never
+  another component class — Tailwind v4 refuses it and the whole stylesheet fails
+  to compile.
 - **The `.hljs-*` rules** colour code and diffs — see *Code and diffs*.
+
+## The page
+
+Every template has the same frame, top to bottom:
+
+1. **A skip link**, the first thing in `<body>`. It is invisible until a keyboard
+   user tabs onto it, then jumps them past the bar to `<main id="main">`.
+2. **The bar**: a sticky, blurred `<header class="bar">` with the page's path on
+   the left in mono and, optionally, a `<nav class="nav">` of section links on the
+   right. On a phone the path truncates and the links scroll sideways.
+3. **The hero**: `.kicker`, `.h1`, `.lede`, and optionally a `.stats` row.
+4. **Sections**, each a `<section id>` with an `.h2`, spaced `pt-16 sm:pt-20`.
+5. **A footer** in small mono saying how the page was produced.
 
 ## Tokens
 
-Colour comes from named tokens, not from Tailwind's palette. Each one already has
-its dark value, so `bg-surface` is correct in both themes and there is no `dark:`
-variant to forget. The dark values are T3 Code's own, read out of the app, with the
-canvas pushed to true black.
+Colour comes from named tokens, not from Tailwind's palette, so `bg-surface` and
+`text-muted` mean the same thing on every page. Six of them, plus the code colours,
+are the palette a theme sets; the rest are mixed from `canvas` and `ink`, so they
+follow any theme. The values below are the defaults: near-black with a warm cast
+and one crimson accent.
 
-| Token | Is | Dark |
+| Token | Is | Default |
 | --- | --- | --- |
-| `canvas` | The page background | `#000` |
-| `surface` | Cards, tables, code blocks, anything on the canvas | 5% white |
-| `ink` | Body text | `#f5f5f5` |
-| `muted` | Labels, captions, secondary text | `#818181` |
-| `line` | Borders and dividers | 9% white |
-| `code` | Inline code, chips, hover fills | 5% white |
-| `accent` | Links, active state, the one chart series | `oklch(65% .21 264)` |
-| `ok` `warn` `bad` | Status, and only status | emerald / amber / red |
+| `canvas` | The page background | `#08040a` |
+| `ink` | Body text | `#f4eff3` |
+| `accent` | Focus, active state, link underlines, the one chart series | `#ff4d66` |
+| `ok` `warn` `bad` | Status, and only status | mint / amber / vermilion |
+| `surface` | Cards, tables, code blocks, anything on the canvas | 4% ink |
+| `raised` | Inline code, chips, hover fills | 8% ink |
+| `muted` | Labels, captions, secondary text | 64% ink |
+| `line` | Borders and dividers | 9% ink |
+| `line-hi` | Borders that must be seen: inputs, chips, empty states | 18% ink |
 
 Each of `accent`, `ok`, `warn`, `bad` has a `-soft` partner for backgrounds,
-derived from it by `color-mix`: `text-bad` on `bg-bad-soft`. Every pairing in that
-table clears WCAG AA in both themes — reach for `text-red-500` instead and you give
-that up.
+derived from it by `color-mix`: `text-bad` on `bg-bad-soft`. Every text pairing in
+that table clears WCAG AA on `canvas` and `surface` — reach for `text-red-500`
+instead and you give that up. `bad` is vermilion rather than crimson so that it
+never reads as the accent.
 
-Retheme a whole page by editing the `:root` and `.dark` blocks. Nothing else.
+Leave the palette and the theme link as they are, and never write a colour
+outside the tokens. A hex value or `text-white` looks fine in the default theme
+and breaks in the reader's light one.
 
 ## Rules
 
 - **Every page ships a favicon.** No exceptions — see *Favicons*.
 - **The heading carries the finding, not the topic.** "Bundle expiry drops links a
-  day early", not "Bundle expiry". It runs to 66px because it is the one thing a
+  day early", not "Bundle expiry". It runs to 66px on a desktop because it is the one thing a
   reader who scrolls no further should leave with. Under it: one standfirst
   paragraph, then a hairline row of the numbers that matter.
 - **Cap prose at 68 characters.** The templates use `max-w-[66ch]`; full width is
   for tables, charts, and code. Past about 75 the eye loses the next line.
 - **Three type sizes in the body.** Size and weight carry the hierarchy; the
   templates set the scale already.
-- **Accent means something.** One hue, spent on links and active state. Colour that
-  decorates stops signalling.
+- **Accent means something.** One hue, spent on focus, active state, and link
+  underlines; link text stays `ink`. Colour that decorates stops signalling.
 - **Density is a feature.** Whitespace separates sections, not every line. A report
   that fits on two screens beats one that fits on six.
 - **Semantic elements.** `<article>`, `<section id>`, `<table>`, `<details>`,
   `<figure>`. They are what makes Ctrl-F, printing, and screen readers work.
 - **Ids on every heading you'd want to link to**, hard-coded in the markup so the
   deep link survives with JS off.
-- **Wrap tables in `overflow-x-auto`.** It is the one element that reliably breaks a
-  narrow screen.
-- **Mark chrome `no-print`.** Reports get printed and turned into PDFs; the theme
-  toggle and filter bar should not follow them there.
+- **Mark chrome `no-print`.** Reports get printed and turned into PDFs; the bar,
+  copy buttons, and filter controls should not follow them there.
 - **One self-contained `.html`.** Inline the CSS and JS. Images are the only thing
   worth uploading alongside.
 
@@ -116,11 +139,41 @@ For anything chart-shaped: one series in `accent`, hand-rolled SVG, and the tabl
 of numbers underneath it. `dashboard.html` has a working example. A chart that
 needs a second hue usually wanted to be a table.
 
+## Phones and keyboards
+
+Every page is read on a phone and driven from a keyboard by someone. The templates
+already do all of this; keep it when you edit them.
+
+- **Nothing scrolls the page sideways at 360px.** The few things wider than a
+  phone scroll inside their own box: tables in `.table-wrap`, code in
+  `<pre class="overflow-x-auto">`, the bar's `.nav`.
+- **A box that scrolls must take focus**, or a keyboard user can't scroll it:
+  `tabindex="0"` on every `<pre>`, and `role="region" aria-label="…"
+  tabindex="0"` on every `.table-wrap`.
+- **Every control is a `<button>`, `<a>`, `<input>`, or `<summary>`.** Never a
+  click handler on a `<div>` or `<th>`; a sortable column puts a `<button>` inside
+  its `<th>` and sets `aria-sort` on the `<th>`.
+- **State is in ARIA, and styled from it.** Filter chips use `aria-pressed`, the
+  current contents link uses `aria-current`, sorted columns use `aria-sort`. The
+  styles read those attributes, so the visible state and the announced state can't
+  drift apart.
+- **Say what changed.** Copy feedback and filter counts sit in `aria-live="polite"`
+  elements, so a screen reader hears "Copied" or "Showing 2 of 4".
+- **Hit targets are at least 36px tall**, and nothing appears only on hover —
+  a phone has no hover, so the copy button is always visible.
+- **Inputs use `text-base` below `sm`**: under 16px, iOS zooms the page when the
+  field takes focus.
+- **One `<h1>`, and headings never skip a level.** Findings are `<h3>` under the
+  list's `<h2>`.
+- **Long unbroken strings wrap**: file paths get `[overflow-wrap:anywhere]`.
+- **Charts draw at their real width.** `dashboard.html` redraws on resize, so
+  axis labels stay 11px on a phone instead of shrinking with a scaled `viewBox`.
+
 ## Code and diffs
 
-`report.html` and `findings.html` load Highlight.js 11.11.1 from jsDelivr. Copy
-the CDN script and local `.hljs-*` theme rules across with any code you paste,
-then use the standard `language-*` class on `<code>`:
+The shell loads Highlight.js 11.11.1 from jsDelivr and carries the `.hljs-*`
+colours, so every template can show code. Use the standard `language-*` class on
+`<code>`:
 
 ```html
 <pre><code class="language-go">func main() { … }</code></pre>
@@ -174,8 +227,8 @@ this:
 ```
 
 The `.icon` rule in the shell sets `fill: none; stroke: currentColor`, so an icon
-takes its colour from whatever it sits in and is correct in both themes with no
-`dark:` variant. Size it with a utility: `size-3.5` in a badge, `size-4` in body
+takes its colour from whatever it sits in, so it never needs a colour of its own.
+Size it with a utility: `size-3.5` in a badge, `size-4` in body
 text.
 
 - **Take them from the sprite.** It costs 24 lines, no network, and no JS, so the
@@ -218,7 +271,7 @@ the one the template shipped with.
 Scripts are enhancements. The page is complete in HTML; JavaScript only adds
 affordances, so a broken script costs a convenience rather than the content.
 
-Worth writing: theme toggle, syntax and diff highlighting, copy-to-clipboard,
+Worth writing: syntax and diff highlighting, copy-to-clipboard,
 filter and search, sortable table, scroll-spy contents, `<details>` disclosure,
 back-to-top. Reach past those and the page has stopped being a document.
 

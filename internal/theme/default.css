@@ -1,0 +1,14 @@
+:root {
+  color-scheme: dark;
+  --canvas: #08040a;
+  --ink: #f4eff3;
+  --accent: #ff4d66;
+  --ok: #4fd69c;
+  --warn: #f2c14e;
+  --bad: #ff6a3d;
+  --t-cm: #857780;
+  --t-str: #f0c987;
+  --t-num: #f6a173;
+  --t-kw: #ff8fa3;
+  --t-fn: #9fb7ff;
+}

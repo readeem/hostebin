@@ -14,6 +14,8 @@ hostebin user ls|add|rm|disable|enable      manage users
 hostebin token new|rm                       rotate or revoke a token
 hostebin whoami [--json]                    show the current identity
 hostebin serve [flags]                      run the server
+hostebin theme [omarchy|FILE]               print a page theme
+hostebin theme set [omarchy|FILE] | rm      set or remove your page theme
 hostebin version                            version, commit, build date
 ```
 
@@ -93,6 +95,9 @@ curl -sf -H "Authorization: Bearer $HOSTEBIN_TOKEN" \
 | `PUT /api/v1/users/{id}/token` | Atomically replace the token, optional `{label, ttl}`; admin or self |
 | `DELETE /api/v1/users/{id}/token` | Revoke the token; admin or self |
 | `GET /b/{id}/...` | Public content; `?raw=1` disables Markdown rendering |
+| `PUT /api/v1/users/{id}/theme` | Set the user's page theme from a CSS body; admin or self |
+| `DELETE /api/v1/users/{id}/theme` | Remove the user's page theme; admin or self |
+| `GET /b/{id}/.../.hostebin/theme.css` | The bundle's theme: the server's, then its owner's |
 
 Metadata fields: raw uploads use the `X-Hostebin-Filename`, `X-Hostebin-Title`,
 `X-Hostebin-Entry`, and `X-Hostebin-TTL` headers; multipart uploads use `title`,
