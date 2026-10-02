@@ -4,6 +4,7 @@ import (
 	"encoding/json"
 	"errors"
 	"io"
+	"io/fs"
 	"net/http"
 	"strings"
 	"time"
@@ -146,6 +147,9 @@ func (s *Server) deleteUser(w http.ResponseWriter, r *http.Request, principal us
 	if err := s.cfg.Users.DeleteUser(r.Context(), id); err != nil {
 		writeUsersError(w, err)
 		return
+	}
+	if err := s.removeUserTheme(id); err != nil && !errors.Is(err, fs.ErrNotExist) {
+		s.cfg.Logger.Warn().Err(err).Str("target_id", id).Msg("remove deleted user's theme")
 	}
 	s.cfg.Logger.Info().Str("action", "delete_user").Str("user", principal.Name).Str("target", target.Name).Msg("user deleted")
 	w.WriteHeader(http.StatusNoContent)

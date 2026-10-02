@@ -33,6 +33,8 @@ func Run(args []string, stdin io.Reader, stdout, stderr io.Writer) int {
 		return runToken(args[1:], stdout, stderr)
 	case "whoami":
 		return runWhoami(args[1:], stdout, stderr)
+	case "theme":
+		return runTheme(args[1:], stdout, stderr)
 	case "version", "--version", "-version":
 		fmt.Fprintln(stdout, version.String())
 		return exitOK
@@ -57,6 +59,9 @@ Commands:
   token new|rm [flags]        rotate or revoke a token
   whoami [--json]             show the authenticated identity
   serve [flags]               run the server
+  theme [omarchy|FILE]        print a page theme
+  theme set [omarchy|FILE]    set your page colours on the server
+  theme rm                    go back to the server's colours
   version                     print version information
   help                        print this message
 

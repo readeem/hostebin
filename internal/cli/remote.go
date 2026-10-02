@@ -134,27 +134,34 @@ func request(method, endpoint, token string) ([]byte, int, error) {
 }
 
 func requestJSON(method, endpoint, token string, value any) ([]byte, int, error) {
-	var requestBody io.Reader
-	if value != nil {
-		encoded, err := json.Marshal(value)
-		if err != nil {
-			return nil, 0, err
-		}
-		requestBody = bytes.NewReader(encoded)
+	if value == nil {
+		return requestBody(method, endpoint, token, "", nil)
 	}
-	req, err := http.NewRequest(method, endpoint, requestBody)
+	encoded, err := json.Marshal(value)
+	if err != nil {
+		return nil, 0, err
+	}
+	return requestBody(method, endpoint, token, "application/json", encoded)
+}
+
+func requestBody(method, endpoint, token, contentType string, body []byte) ([]byte, int, error) {
+	var reader io.Reader
+	if body != nil {
+		reader = bytes.NewReader(body)
+	}
+	req, err := http.NewRequest(method, endpoint, reader)
 	if err != nil {
 		return nil, 0, err
 	}
 	req.Header.Set("Authorization", "Bearer "+token)
-	if value != nil {
-		req.Header.Set("Content-Type", "application/json")
+	if contentType != "" {
+		req.Header.Set("Content-Type", contentType)
 	}
 	resp, err := http.DefaultClient.Do(req)
 	if err != nil {
 		return nil, 0, err
 	}
 	defer resp.Body.Close()
-	body, err := io.ReadAll(resp.Body)
-	return body, resp.StatusCode, err
+	out, err := io.ReadAll(resp.Body)
+	return out, resp.StatusCode, err
 }

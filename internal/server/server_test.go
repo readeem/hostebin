@@ -15,6 +15,7 @@ import (
 	"time"
 
 	"github.com/readeem/hostebin/internal/store"
+	"github.com/readeem/hostebin/internal/theme"
 	"github.com/readeem/hostebin/internal/users"
 	"github.com/readeem/hostebin/internal/users/filestore"
 	"github.com/rs/zerolog"
@@ -198,8 +199,11 @@ func TestMarkdownRawListingAndExpired(t *testing.T) {
 	rendered, _ := http.Get(md.URL)
 	html, _ := io.ReadAll(rendered.Body)
 	rendered.Body.Close()
-	if !strings.Contains(string(html), "<h1>hi</h1>") || rendered.Header.Get("Content-Type") != "text/html; charset=utf-8" {
+	if !strings.Contains(string(html), `<h1 id="hi">hi</h1>`) || rendered.Header.Get("Content-Type") != "text/html; charset=utf-8" {
 		t.Fatalf("markdown = %q", html)
+	}
+	if !strings.Contains(string(html), string(theme.Default)) {
+		t.Fatalf("markdown page does not inline the theme: %q", html)
 	}
 	raw, _ := http.Get(md.EntryURL + "?raw=1")
 	rawBody, _ := io.ReadAll(raw.Body)
@@ -445,6 +449,13 @@ func TestBundleHostServesAndIsolates(t *testing.T) {
 	posted.Body.Close()
 	if posted.StatusCode != http.StatusMethodNotAllowed {
 		t.Fatalf("POST on bundle host = %d, want 405", posted.StatusCode)
+	}
+
+	themed := get(ts.URL+ThemePath, host)
+	css, _ := io.ReadAll(themed.Body)
+	themed.Body.Close()
+	if themed.StatusCode != http.StatusOK || string(css) != string(theme.Default) || themed.Header.Get("ETag") == "" {
+		t.Fatalf("theme on bundle host = %d %q", themed.StatusCode, css)
 	}
 
 	traversal := get(ts.URL+"/../../etc/passwd", host)
@@ -744,5 +755,63 @@ func TestAdminReachesEveryBundle(t *testing.T) {
 	deleted.Body.Close()
 	if deleted.StatusCode != http.StatusNoContent {
 		t.Fatalf("admin delete = %d", deleted.StatusCode)
+	}
+}
+
+func TestUserThemesFollowBundleOwner(t *testing.T) {
+	_, ts := testServer(t, 4096, 8)
+	created := authRequest(t, http.MethodPost, ts.URL+"/api/v1/users", "test-token", `{"name":"bob"}`)
+	var bob struct {
+		User      users.User `json:"user"`
+		Plaintext string     `json:"plaintext"`
+	}
+	if err := json.NewDecoder(created.Body).Decode(&bob); err != nil {
+		t.Fatal(err)
+	}
+	created.Body.Close()
+	themeURL := ts.URL + "/api/v1/users/" + bob.User.ID + "/theme"
+	status := func(resp *http.Response) int {
+		resp.Body.Close()
+		return resp.StatusCode
+	}
+	get := func(url string) string {
+		t.Helper()
+		resp, err := http.Get(url)
+		if err != nil {
+			t.Fatal(err)
+		}
+		defer resp.Body.Close()
+		body, _ := io.ReadAll(resp.Body)
+		return string(body)
+	}
+
+	if code := status(authRequest(t, http.MethodPut, themeURL, bob.Plaintext, ":root { --accent: #00ff00; }")); code != http.StatusNoContent {
+		t.Fatalf("set own theme = %d", code)
+	}
+	if code := status(authRequest(t, http.MethodPut, themeURL, bob.Plaintext, "</style><script>")); code != http.StatusBadRequest {
+		t.Fatalf("theme with markup = %d, want 400", code)
+	}
+	if code := status(authRequest(t, http.MethodDelete, ts.URL+"/api/v1/users/u_someone_else/theme", bob.Plaintext, "")); code != http.StatusForbidden {
+		t.Fatalf("change another user's theme = %d, want 403", code)
+	}
+
+	_, bobs := rawUpload(t, ts, "notes/plan.md", "# plan", bob.Plaintext)
+	_, admins := rawUpload(t, ts, "plan.md", "# plan", "test-token")
+	bobTheme := get(ts.URL + "/b/" + bobs.ID + "/notes/.hostebin/theme.css")
+	if !strings.HasPrefix(bobTheme, string(theme.Default)) || !strings.HasSuffix(bobTheme, "#00ff00; }") {
+		t.Fatalf("bob's bundle theme = %q", bobTheme)
+	}
+	if !strings.Contains(get(bobs.EntryURL), "#00ff00") {
+		t.Fatal("bob's rendered markdown ignores his theme")
+	}
+	if strings.Contains(get(ts.URL+"/b/"+admins.ID+"/.hostebin/theme.css"), "#00ff00") {
+		t.Fatal("bob's theme leaked into another owner's bundle")
+	}
+
+	if code := status(authRequest(t, http.MethodDelete, themeURL, bob.Plaintext, "")); code != http.StatusNoContent {
+		t.Fatalf("remove theme = %d", code)
+	}
+	if strings.Contains(get(ts.URL+"/b/"+bobs.ID+"/.hostebin/theme.css"), "#00ff00") {
+		t.Fatal("removed theme still served")
 	}
 }

@@ -10,6 +10,7 @@ import (
 
 	"github.com/yuin/goldmark"
 	"github.com/yuin/goldmark/extension"
+	"github.com/yuin/goldmark/parser"
 	"github.com/yuin/goldmark/renderer/html"
 )
 
@@ -37,12 +38,16 @@ func newRenderer() (*renderer, error) {
 		return nil, err
 	}
 	return &renderer{
-		markdown: goldmark.New(goldmark.WithExtensions(extension.GFM), goldmark.WithRendererOptions(html.WithUnsafe())),
-		md:       md, dir: dir, css: template.CSS(css),
+		markdown: goldmark.New(
+			goldmark.WithExtensions(extension.GFM),
+			goldmark.WithParserOptions(parser.WithAutoHeadingID()),
+			goldmark.WithRendererOptions(html.WithUnsafe()),
+		),
+		md: md, dir: dir, css: template.CSS(css),
 	}, nil
 }
 
-func (r *renderer) renderMarkdown(dst io.Writer, name string, src io.Reader) error {
+func (r *renderer) renderMarkdown(dst io.Writer, name string, src io.Reader, theme []byte) error {
 	input, err := io.ReadAll(src)
 	if err != nil {
 		return err
@@ -52,18 +57,18 @@ func (r *renderer) renderMarkdown(dst io.Writer, name string, src io.Reader) err
 		return err
 	}
 	return r.md.ExecuteTemplate(dst, "md.html.tmpl", map[string]any{
-		"Title": path.Base(name), "CSS": r.css, "Body": template.HTML(body.String()),
+		"Title": path.Base(name), "CSS": r.css, "Theme": template.CSS(theme), "Body": template.HTML(body.String()),
 	})
 }
 
 type listingFile struct{ Name, URL, Size string }
 
-func (r *renderer) renderListing(dst io.Writer, title, description string, files []listingFile) error {
+func (r *renderer) renderListing(dst io.Writer, title, description string, files []listingFile, theme []byte) error {
 	if title == "" {
 		title = "hostebin bundle"
 	}
 	return r.dir.ExecuteTemplate(dst, "dir.html.tmpl", map[string]any{
-		"Title": title, "Description": description, "Files": files, "CSS": r.css,
+		"Title": title, "Description": description, "Files": files, "CSS": r.css, "Theme": template.CSS(theme),
 	})
 }
 

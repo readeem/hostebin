@@ -20,7 +20,7 @@ they are incidental. If you add one to any badge, add one to all of them.
 <span class="rounded-full bg-ok-soft px-2 py-0.5 text-xs font-medium text-ok">Passing</span>
 <span class="rounded-full bg-warn-soft px-2 py-0.5 text-xs font-medium text-warn">Flaky</span>
 <span class="rounded-full bg-bad-soft px-2 py-0.5 text-xs font-medium text-bad">Failing</span>
-<span class="rounded-full bg-canvas px-2 py-0.5 text-xs font-medium text-muted ring-1 ring-line">Skipped</span>
+<span class="rounded-full bg-raised px-2 py-0.5 text-xs font-medium text-muted">Skipped</span>
 ```
 
 ```html
@@ -86,13 +86,13 @@ gets squeezed to nothing.
 
 ```html
 <div class="grid gap-4 md:grid-cols-2">
-  <div class="rounded-xl border border-line bg-surface">
+  <div class="card overflow-hidden">
     <p class="border-b border-line px-4 py-2 text-xs font-semibold tracking-wide text-muted uppercase">Before</p>
-    <pre class="overflow-x-auto px-4 py-3 font-mono text-xs/6"><code>old</code></pre>
+    <pre tabindex="0" class="overflow-x-auto px-4 py-3 font-mono text-xs/6"><code>old</code></pre>
   </div>
-  <div class="rounded-xl border border-line bg-surface">
+  <div class="card overflow-hidden">
     <p class="border-b border-line px-4 py-2 text-xs font-semibold tracking-wide text-muted uppercase">After</p>
-    <pre class="overflow-x-auto px-4 py-3 font-mono text-xs/6"><code>new</code></pre>
+    <pre tabindex="0" class="overflow-x-auto px-4 py-3 font-mono text-xs/6"><code>new</code></pre>
   </div>
 </div>
 ```
@@ -103,7 +103,7 @@ Paste the raw patch and let Highlight.js tint it; see *Code and diffs* in
 `SKILL.md`, and include the CDN script from `templates/report.html`.
 
 ```html
-<pre class="overflow-x-auto py-3.5 font-mono text-xs/6"><code class="language-diff">@@ -12,3 +12,3 @@
+<pre tabindex="0" class="overflow-x-auto py-3.5 font-mono text-xs/6"><code class="language-diff">@@ -12,3 +12,3 @@
  	func serve() {
 -		log.Print("v1")
 +		log.Print("v2")</code></pre>
@@ -117,7 +117,7 @@ the caption says what to look at.
 ```html
 <figure class="my-6">
   <img src="chart.png" alt="Describe what the image shows, not that it is an image."
-       class="max-w-full rounded-xl border border-line">
+       class="max-w-full rounded-[14px] border border-line">
   <figcaption class="mt-2 text-sm text-muted">What the reader should notice in it.</figcaption>
 </figure>
 ```
@@ -130,7 +130,7 @@ Upload the image alongside the page so the relative path resolves:
 Shown when a filter or a query matches nothing. Say what would fill it.
 
 ```html
-<p class="rounded-xl border border-dashed border-line px-4 py-10 text-center text-sm text-muted">
+<p class="rounded-[18px] border border-dashed border-line-hi px-4 py-10 text-center text-sm text-muted">
   No findings at this severity.
 </p>
 ```
@@ -140,12 +140,12 @@ Shown when a filter or a query matches nothing. Say what would fill it.
 For tables long enough to scroll past their own header.
 
 ```html
-<div class="max-h-[70vh] overflow-auto rounded-xl border border-line">
-  <table class="w-full border-collapse text-sm">
-    <thead class="sticky top-0 bg-surface text-left shadow-[0_1px_0_var(--line)]">
-      <tr><th class="px-4 py-2.5 font-semibold">Name</th></tr>
+<div class="table-wrap max-h-[70vh] overflow-y-auto" role="region" aria-label="Name the table" tabindex="0">
+  <table class="data">
+    <thead class="sticky top-0 shadow-[0_1px_0_var(--line)]">
+      <tr><th scope="col">Name</th></tr>
     </thead>
-    <tbody class="divide-y divide-line"><!-- rows --></tbody>
+    <tbody><!-- rows --></tbody>
   </table>
 </div>
 ```
@@ -153,18 +153,19 @@ For tables long enough to scroll past their own header.
 ## Tabs
 
 Only when two views are genuinely alternatives. Panels are in the HTML, so with
-JS off the reader sees all of them stacked rather than none.
+JS off the reader sees all of them stacked rather than none. Arrow keys move
+between tabs and Tab moves into the panel, as screen-reader users expect.
 
 ```html
 <div class="tabs">
-  <div class="mb-4 flex gap-1 border-b border-line" role="tablist">
-    <button role="tab" aria-selected="true"  aria-controls="p1"
-            class="-mb-px border-b-2 border-transparent px-3 py-2 text-sm text-muted aria-selected:border-accent aria-selected:font-medium aria-selected:text-ink">Summary</button>
-    <button role="tab" aria-selected="false" aria-controls="p2"
-            class="-mb-px border-b-2 border-transparent px-3 py-2 text-sm text-muted aria-selected:border-accent aria-selected:font-medium aria-selected:text-ink">Raw output</button>
+  <div class="mb-4 flex gap-1 overflow-x-auto border-b border-line" role="tablist" aria-label="Output">
+    <button role="tab" id="t1" aria-selected="true"  aria-controls="p1"
+            class="-mb-px min-h-10 shrink-0 border-b-2 border-transparent px-3 text-sm text-muted hover:text-ink aria-selected:border-accent aria-selected:font-medium aria-selected:text-ink">Summary</button>
+    <button role="tab" id="t2" aria-selected="false" aria-controls="p2"
+            class="-mb-px min-h-10 shrink-0 border-b-2 border-transparent px-3 text-sm text-muted hover:text-ink aria-selected:border-accent aria-selected:font-medium aria-selected:text-ink">Raw output</button>
   </div>
-  <div id="p1" role="tabpanel">First panel.</div>
-  <div id="p2" role="tabpanel">Second panel.</div>
+  <div id="p1" role="tabpanel" aria-labelledby="t1" tabindex="0">First panel.</div>
+  <div id="p2" role="tabpanel" aria-labelledby="t2" tabindex="0">Second panel.</div>
 </div>
 
 <script>
@@ -174,10 +175,20 @@ for (const group of document.querySelectorAll('.tabs')) {
     for (const t of tabs) {
       const on = t === tab;
       t.setAttribute('aria-selected', String(on));
+      t.tabIndex = on ? 0 : -1;
       document.getElementById(t.getAttribute('aria-controls')).hidden = !on;
     }
   };
-  for (const t of tabs) t.addEventListener('click', () => show(t));
+  for (const [i, t] of tabs.entries()) {
+    t.addEventListener('click', () => show(t));
+    t.addEventListener('keydown', e => {
+      const step = { ArrowRight: 1, ArrowLeft: -1 }[e.key];
+      if (!step) return;
+      const next = tabs[(i + step + tabs.length) % tabs.length];
+      show(next);
+      next.focus();
+    });
+  }
   show(tabs[0]);
 }
 </script>
@@ -193,11 +204,11 @@ Numbered sources at the foot of a report. The ids let the body link into them.
   <ol class="space-y-1.5 text-sm text-muted">
     <li id="ref-1">
       <span class="tabular-nums">[1]</span>
-      <a href="https://example.com" class="text-accent underline decoration-accent/35 underline-offset-2">Title of the source</a>
+      <a href="https://example.com" class="link">Title of the source</a>
       — what it was used for.
     </li>
   </ol>
 </section>
 ```
 
-Cite it inline with `<a href="#ref-1" class="text-accent">[1]</a>`.
+Cite it inline with `<a href="#ref-1" class="link">[1]</a>`.

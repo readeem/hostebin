@@ -40,6 +40,10 @@ func (s *Server) serveBundleContent(w http.ResponseWriter, r *http.Request, id, 
 		http.NotFound(w, r)
 		return
 	}
+	if name == ThemeFile || strings.HasSuffix(name, "/"+ThemeFile) {
+		s.serveTheme(w, r, meta.OwnerID)
+		return
+	}
 	if name == "" {
 		if meta.Entry != "" {
 			s.serveFile(w, r, meta, meta.Entry)
@@ -82,7 +86,7 @@ func (s *Server) serveFile(w http.ResponseWriter, r *http.Request, meta *store.B
 	ext := strings.ToLower(path.Ext(name))
 	if !raw && (ext == ".md" || ext == ".markdown") {
 		w.Header().Set("Content-Type", "text/html; charset=utf-8")
-		if err := s.renderer.renderMarkdown(w, name, f); err != nil {
+		if err := s.renderer.renderMarkdown(w, name, f, s.themeCSS(meta.OwnerID)); err != nil {
 			s.cfg.Logger.Error().Err(err).Msg("render markdown")
 		}
 		return
@@ -110,7 +114,7 @@ func (s *Server) serveListing(w http.ResponseWriter, _ *http.Request, meta *stor
 		files = append(files, listingFile{Name: f.Name, URL: strings.Join(parts, "/"), Size: humanBytes(f.Size)})
 	}
 	description := fmt.Sprintf("%d files · %s", len(meta.Files), humanBytes(meta.Bytes))
-	if err := s.renderer.renderListing(w, meta.Title, description, files); err != nil {
+	if err := s.renderer.renderListing(w, meta.Title, description, files, s.themeCSS(meta.OwnerID)); err != nil {
 		s.cfg.Logger.Error().Err(err).Msg("render listing")
 	}
 }
