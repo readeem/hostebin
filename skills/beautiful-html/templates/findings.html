@@ -277,7 +277,6 @@ html { background: var(--canvas); color: var(--ink); font: 16px/1.6 "DM Sans", u
 </footer>
 
 <script>
-// Filtering is an enhancement: every finding is in the HTML and visible without it.
 const findings = [...document.querySelectorAll('.finding')];
 const chips = [...document.querySelectorAll('.chip')];
 const search = document.getElementById('q');
@@ -307,7 +306,6 @@ for (const chip of chips) {
 }
 search?.addEventListener('input', apply);
 
-// "/" focuses the filter, Escape clears it.
 addEventListener('keydown', e => {
   const typing = e.target.closest?.('input, textarea, select, [contenteditable]');
   if (e.key === '/' && !typing) { e.preventDefault(); search?.focus(); }

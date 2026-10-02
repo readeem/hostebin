@@ -289,11 +289,9 @@ func (s *Store) Backfill(ctx context.Context) (int, error) {
 </footer>
 
 <script>
-// Every behaviour below is an enhancement: the page is complete without it.
 
 addEventListener('DOMContentLoaded', () => globalThis.hljs?.highlightAll());
 
-// Copy code. Swapping the <use> href rather than textContent keeps the icon.
 for (const btn of document.querySelectorAll('.copy-btn')) {
   const icon = btn.querySelector('use');
   const label = btn.querySelector('.copy-label');
@@ -309,8 +307,6 @@ for (const btn of document.querySelectorAll('.copy-btn')) {
   });
 }
 
-// Mark the contents link for the section being read, and keep it in view
-// when the bar scrolls sideways on a phone.
 const toc = document.getElementById('toc');
 const tocLinks = [...toc?.querySelectorAll('a') ?? []];
 const tocSections = tocLinks.map(a => document.getElementById(a.hash.slice(1)));

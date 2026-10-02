@@ -2,6 +2,7 @@ package server
 
 import (
 	"bytes"
+	"crypto/rand"
 	"crypto/sha256"
 	"encoding/hex"
 	"errors"
@@ -26,8 +27,8 @@ const (
 
 const maxThemeBytes = 64 << 10
 
-func (s *Server) userThemePath(userID string) string {
-	return filepath.Join(s.cfg.Store.DataDir(), "themes", userID+".css")
+func userThemeName(userID string) string {
+	return filepath.Join("themes", userID+".css")
 }
 
 func (s *Server) themeCSS(ownerID string) []byte {
@@ -39,14 +40,20 @@ func (s *Server) themeCSS(ownerID string) []byte {
 	if ownerID == "" {
 		return css
 	}
-	own, err := os.ReadFile(s.userThemePath(ownerID))
+	root, err := os.OpenRoot(s.cfg.Store.DataDir())
+	if err != nil {
+		s.cfg.Logger.Warn().Err(err).Msg("open theme storage")
+		return css
+	}
+	defer root.Close()
+	own, err := root.ReadFile(userThemeName(ownerID))
 	if err != nil {
 		if !errors.Is(err, fs.ErrNotExist) {
 			s.cfg.Logger.Warn().Err(err).Str("user_id", ownerID).Msg("load user theme")
 		}
 		return css
 	}
-	return append(append(append([]byte{}, css...), '\n'), own...)
+	return theme.Layer(css, own)
 }
 
 func (s *Server) serveTheme(w http.ResponseWriter, r *http.Request, ownerID string) {
@@ -68,22 +75,11 @@ func (s *Server) setTheme(w http.ResponseWriter, r *http.Request, principal user
 		writeError(w, http.StatusRequestEntityTooLarge, "theme is larger than 64 KiB")
 		return
 	}
-	// Rendered pages inline the theme in a <style> element, which "<" could close.
 	if bytes.ContainsRune(css, '<') {
 		writeError(w, http.StatusBadRequest, `theme must not contain "<"`)
 		return
 	}
-	path := s.userThemePath(userID)
-	if err := os.MkdirAll(filepath.Dir(path), 0o755); err != nil {
-		writeError(w, http.StatusInternalServerError, err.Error())
-		return
-	}
-	tmp := path + ".tmp"
-	if err := os.WriteFile(tmp, css, 0o644); err != nil {
-		writeError(w, http.StatusInternalServerError, err.Error())
-		return
-	}
-	if err := os.Rename(tmp, path); err != nil {
+	if err := s.writeUserTheme(userID, css); err != nil {
 		writeError(w, http.StatusInternalServerError, err.Error())
 		return
 	}
@@ -96,12 +92,49 @@ func (s *Server) removeTheme(w http.ResponseWriter, r *http.Request, principal u
 	if !ok {
 		return
 	}
-	if err := os.Remove(s.userThemePath(userID)); err != nil && !errors.Is(err, fs.ErrNotExist) {
+	if err := s.removeUserTheme(userID); err != nil && !errors.Is(err, fs.ErrNotExist) {
 		writeError(w, http.StatusInternalServerError, err.Error())
 		return
 	}
 	s.cfg.Logger.Info().Str("action", "remove_theme").Str("user", principal.Name).Str("target_id", userID).Msg("theme removed")
 	w.WriteHeader(http.StatusNoContent)
+}
+
+func (s *Server) writeUserTheme(userID string, css []byte) error {
+	root, err := os.OpenRoot(s.cfg.Store.DataDir())
+	if err != nil {
+		return err
+	}
+	defer root.Close()
+	if err := root.MkdirAll("themes", 0o755); err != nil {
+		return err
+	}
+	tmp := filepath.Join("themes", ".tmp-"+rand.Text())
+	f, err := root.OpenFile(tmp, os.O_WRONLY|os.O_CREATE|os.O_EXCL, 0o644)
+	if err != nil {
+		return err
+	}
+	defer root.Remove(tmp)
+	defer f.Close()
+	if _, err := f.Write(css); err != nil {
+		return err
+	}
+	if err := f.Sync(); err != nil {
+		return err
+	}
+	if err := f.Close(); err != nil {
+		return err
+	}
+	return root.Rename(tmp, userThemeName(userID))
+}
+
+func (s *Server) removeUserTheme(userID string) error {
+	root, err := os.OpenRoot(s.cfg.Store.DataDir())
+	if err != nil {
+		return err
+	}
+	defer root.Close()
+	return root.Remove(userThemeName(userID))
 }
 
 func (s *Server) themeTarget(w http.ResponseWriter, r *http.Request, principal users.Principal) (string, bool) {

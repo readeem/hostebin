@@ -3,6 +3,7 @@
 package theme
 
 import (
+	"bytes"
 	_ "embed"
 	"errors"
 	"fmt"
@@ -52,10 +53,15 @@ func Resolve(spec string) (Source, string, error) {
 			if err != nil {
 				return nil, err
 			}
-			return append(append(append([]byte{}, Default...), '\n'), css...), nil
+			return Layer(Default, css), nil
 		}
 		return checked(src, spec)
 	}
+}
+
+// Layer appends an overriding stylesheet without changing either input.
+func Layer(base, override []byte) []byte {
+	return append(append(bytes.Clone(base), '\n'), override...)
 }
 
 func checked(src Source, name string) (Source, string, error) {

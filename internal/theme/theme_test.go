@@ -4,6 +4,7 @@ import (
 	"os"
 	"path/filepath"
 	"regexp"
+	"runtime"
 	"strings"
 	"testing"
 )
@@ -62,11 +63,14 @@ green = "#40a02b"
 	if accent, _ := parseHex(got["accent"]); contrast(accent, bg) < 4.5 {
 		t.Errorf("accent %s is unreadable on the canvas", got["accent"])
 	}
-	for _, name := range []string{"muted", "ok", "warn", "bad", "t-str"} {
+	for _, name := range []string{"ok", "warn", "bad", "t-str"} {
 		c, _ := parseHex(got[name])
 		if r := contrast(c, bg.mix(fg, 0.08)); r < 4.5 {
 			t.Errorf("%s %s has contrast %.2f", name, got[name], r)
 		}
+	}
+	if !strings.Contains(got["muted"], "var(--ink)") || !strings.Contains(got["muted"], "var(--canvas)") {
+		t.Errorf("muted text does not follow the final palette: %s", got["muted"])
 	}
 
 	if _, err := fromOmarchy([]byte(`accent = "#fff"`)); err == nil {
@@ -76,7 +80,11 @@ green = "#40a02b"
 
 func TestResolve(t *testing.T) {
 	home := t.TempDir()
-	t.Setenv("HOME", home)
+	if runtime.GOOS == "windows" {
+		t.Setenv("USERPROFILE", home)
+	} else {
+		t.Setenv("HOME", home)
+	}
 
 	if _, name, err := Resolve(""); err != nil || name != "default" {
 		t.Fatalf("Resolve without Omarchy = %q, %v", name, err)

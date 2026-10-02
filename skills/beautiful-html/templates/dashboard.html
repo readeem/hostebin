@@ -256,7 +256,6 @@ html { background: var(--canvas); color: var(--ink); font: 16px/1.6 "DM Sans", u
 </footer>
 
 <script>
-// Hand-rolled SVG: no chart library, and it re-themes with the page.
 (() => {
   const svg = document.getElementById('chart');
   const raw = document.getElementById('series')?.textContent;
@@ -305,7 +304,6 @@ html { background: var(--canvas); color: var(--ink); font: 16px/1.6 "DM Sans", u
   new ResizeObserver(draw).observe(svg);
 })();
 
-// The table is already in a sensible order in the HTML; this only reorders it.
 (() => {
   const table = document.getElementById('data');
   if (!table) return;

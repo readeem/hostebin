@@ -56,6 +56,14 @@ func fromOmarchy(raw []byte) ([]byte, error) {
 		bad, _ = parseHex(fallback[2])
 	}
 	raised := canvas.mix(ink, 0.08)
+	mutedWeight := 1.0
+	for i := range 21 {
+		weight := 0.64 + 0.36*float64(i)/20
+		if contrast(canvas.mix(ink, weight), raised) >= minContrast {
+			mutedWeight = weight
+			break
+		}
+	}
 	text := func(c rgb) string {
 		return c.towards(pole, func(m rgb) bool {
 			chip := canvas.mix(ink, 0.04).mix(m, 0.14)
@@ -74,7 +82,7 @@ func fromOmarchy(raw []byte) ([]byte, error) {
 	for _, t := range [][2]string{
 		{"canvas", canvas.String()},
 		{"ink", ink.String()},
-		{"muted", canvas.mix(ink, 0.64).towards(ink, func(m rgb) bool { return contrast(m, raised) >= minContrast }).String()},
+		{"muted", fmt.Sprintf("color-mix(in srgb, var(--ink) %.1f%%, var(--canvas))", mutedWeight*100)},
 		{"accent", accent.towards(pole, func(m rgb) bool { return contrast(m, canvas) >= minContrast }).String()},
 		{"ok", text(ok)},
 		{"warn", text(warn)},
