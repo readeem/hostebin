@@ -7,7 +7,7 @@ require (
 	github.com/rs/zerolog v1.35.1
 	github.com/yuin/goldmark v1.8.6
 	golang.org/x/crypto v0.57.0
-	tailscale.com v1.102.4
+	tailscale.com v1.102.5
 )
 
 require (
