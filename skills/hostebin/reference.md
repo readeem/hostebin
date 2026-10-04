@@ -60,7 +60,7 @@ on Linux/BSD, `<user config dir>/hostebin/data` elsewhere.
 ## HTTP API
 
 Every `/api/v1` route needs `Authorization: Bearer $HOSTEBIN_TOKEN`. Bundle content
-under `/b/{id}/` and `/healthz` are public.
+under `/b/{id}/` and `/healthz` need no token.
 
 ```sh
 # raw single file
@@ -94,7 +94,7 @@ curl -sf -H "Authorization: Bearer $HOSTEBIN_TOKEN" \
 | `DELETE /api/v1/users/{id}` | Delete; use `?bundles=delete|reassign` when needed |
 | `PUT /api/v1/users/{id}/token` | Atomically replace the token, optional `{label, ttl}`; admin or self |
 | `DELETE /api/v1/users/{id}/token` | Revoke the token; admin or self |
-| `GET /b/{id}/...` | Public content; `?raw=1` disables Markdown rendering |
+| `GET /b/{id}/...` | Bundle content, no token; `?raw=1` disables Markdown rendering |
 | `PUT /api/v1/users/{id}/theme` | Set the user's page theme from a CSS body; admin or self |
 | `DELETE /api/v1/users/{id}/theme` | Remove the user's page theme; admin or self |
 | `GET /b/{id}/.../.hostebin/theme.css` | The bundle's theme: the server's, then its owner's |
@@ -122,10 +122,11 @@ Status codes: `201` created, `200` updated, `204` deleted, `400` bad request,
 
 Hosted content is untrusted: no cookie auth, `X-Content-Type-Options: nosniff`,
 unknown extensions served as `application/octet-stream`, and a permissive-but-scoped
-default CSP. All bundles share one origin, so an unguessable ID is the read
-capability — treat every bundle URL as a secret-bearing link. Ownership scopes list,
-replace, and delete operations for regular users; admins reach every bundle. Reads stay
-public and unauthenticated.
+default CSP. Reads need no token: the 128-bit bundle ID in the URL is the read
+capability, so treat every bundle URL as a secret-bearing link. Unless the server runs
+with `--bundle-host`, all bundles share one origin, so a page can reach another bundle
+whose ID it knows. Ownership scopes list, replace, and delete operations for regular
+users; admins reach every bundle.
 
 Each user has at most one bearer token. Creating a token atomically replaces the
 current token, and the old value fails authentication on the next request.

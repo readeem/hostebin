@@ -1,12 +1,13 @@
 ---
 name: beautiful-html
-description: Design HTML pages worth reading — reports, plans, research writeups, reviews, dashboards. Use before writing any HTML meant to be opened as a link.
+description: Build the HTML page for a hostebin writeup (report, review, plan, research, dashboard). Use before writing any page that will be published with hostebin. A project's own website or app UI follows that project's conventions instead.
 ---
 
 # Beautiful HTML
 
-A page built from these parts reads well on a phone and a desktop, works from the
-keyboard, prints, and survives a dead CDN. Publish the finished file with the `hostebin` skill.
+A writeup built from these parts reads well on a phone and a desktop, works from the
+keyboard, prints, and survives a dead CDN. It is one standalone file, published with
+the `hostebin` skill; a project's own site or app keeps that project's stack and styles.
 
 When using a template, you generally don't need to verify the HTML. Once `hostebin`
 returns a URL, report it without reopening it; a sound local page is sufficient.
@@ -204,8 +205,8 @@ comes back. Three things follow from that, and the first is the one that matters
   `fetch` is for a page whose job is to be *current*, not for saving yourself a
   paste. `dashboard.html` inlines its series in a
   `<script type="application/json">` for exactly this reason.
-- **Keep credentials out of the page.** Reads are public — anyone with the link has
-  the key, and links get pasted into issues and chats. Only unauthenticated,
+- **Keep credentials out of the page.** Anyone holding the link can read its
+  source, and links get pasted into issues and chats. Only unauthenticated,
   CORS-enabled endpoints belong here.
 - **Render something useful when the call fails**, because it will — CORS, an
   expired endpoint, a reader offline. Ship the last known values in the HTML and

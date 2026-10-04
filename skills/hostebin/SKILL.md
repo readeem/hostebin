@@ -1,6 +1,6 @@
 ---
 name: hostebin
-description: Publish HTML, Markdown, images, or a whole static folder to a shareable web URL with the hostebin CLI. Use when someone needs to read generated output in a browser instead of a terminal, or when an already-published link must be updated, listed, or deleted.
+description: Publish a writeup (report, review, plan, research, dashboard) or any HTML, Markdown, images, or static folder to a shareable link with the hostebin CLI. Use when output should be read in a browser rather than a terminal, or when a published link must be updated, listed, or deleted.
 ---
 
 # Publishing with hostebin
@@ -11,11 +11,13 @@ page.
 
 ## Publishing a writeup
 
-1. **Write the page.** The `beautiful-html` skill has the templates and the layout
-   rules for a document worth reading.
+A writeup is a report, review, plan, research, or dashboard: a page someone reads.
+
+1. **Build it with `beautiful-html`.** Invoke that skill before writing any HTML
+   and start from one of its templates. Every writeup starts there.
 2. **Upload it with a title and a TTL.**
    ```sh
-   hostebin up --title 'Weekly report' --ttl 14d report.html
+   hostebin up --title 'Weekly report' --ttl 30d report.html
    ```
    The title is what the reader sees in the tab and in `hostebin ls`, so make it
    say what the page is. The default expiry is `never`; two weeks outlives almost
@@ -60,14 +62,18 @@ hostebin up --json report.html
 ## Rules that matter
 
 - **Markdown is rendered** as a styled HTML page; add `?raw=1` to the URL for source.
+  Use it to publish Markdown that already exists; a writeup you author is a
+  `beautiful-html` page.
 - **The entry page** is picked automatically: a single file, else `index.html`, else
   the first HTML file, else the first Markdown file, else a generated file listing.
   Override with `--entry path/to/file.html`.
 - **Self-contained output wins.** Inline CSS/JS or upload assets alongside the page;
   bundles cannot reference files from other bundles.
-- **Reads are public.** Anyone with the link can read it. Never upload secrets,
-  credentials, tokens, private keys, or personal data. Say so if the user asks you
-  to publish something that looks sensitive.
+- **The link is the key.** Reading needs no login, but it needs the URL: the bundle
+  ID is 128 random bits, and the server may be reachable only inside a private
+  tailnet. A page is as private as its link, so hand the link over plainly. Keep
+  live credentials (tokens, passwords, private keys) out of uploads; a link outlives
+  the chat it was pasted into.
 - **Update in place while iterating**, so the link you already gave the person keeps
   working:
   ```sh
