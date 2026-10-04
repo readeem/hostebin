@@ -26,8 +26,10 @@ just up README.md
 
 ## Expectations
 
-- `just check` passes. `just test-all` (adds `-tags notsnet` and `-race`) is what CI
-  runs on Linux, macOS, and Windows.
+- `just check` passes. `just test-all` adds `-tags notsnet` and `-race`. CI runs the
+  tests on Linux, macOS, and Windows, and `-race` on Linux only.
+- Tests that touch the home directory must set both `HOME` and `USERPROFILE`;
+  Windows reads `USERPROFILE`.
 - New behaviour comes with a test. The existing tests in `internal/cli`,
   `internal/server`, and `internal/store` are good models.
 - Keep the build tag split working: anything touching listeners must compile and

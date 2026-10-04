@@ -63,6 +63,10 @@ func runUp(args []string, stdin io.Reader, stdout, stderr io.Writer) int {
 		fmt.Fprintln(stderr, "usage: hostebin up [flags] <file|directory|->...")
 		return exitUsage
 	}
+	if flagArg := trailingFlag(args, fs.Args()); flagArg != "" {
+		fmt.Fprintln(stderr, "hostebin: flags must come before files:", flagArg)
+		return exitUsage
+	}
 	if err := resolveClientConfig(cfg); err != nil {
 		fmt.Fprintln(stderr, "hostebin:", err)
 		return exitUsage
@@ -191,6 +195,18 @@ func runUp(args []string, stdin io.Reader, stdout, stderr io.Writer) int {
 		openURL(result.URL, quiet, stderr)
 	}
 	return exitOK
+}
+
+func trailingFlag(args, positional []string) string {
+	if slices.Contains(args, "--") {
+		return ""
+	}
+	for _, arg := range positional {
+		if len(arg) > 1 && arg[0] == '-' {
+			return arg
+		}
+	}
+	return ""
 }
 
 func collectFiles(args []string, stdinName string) ([]localFile, error) {
