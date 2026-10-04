@@ -138,3 +138,14 @@ func TestUserAndTokenStdoutContracts(t *testing.T) {
 		t.Fatalf("revoked token whoami code = %d", code)
 	}
 }
+
+func TestUpRejectsFlagsAfterFiles(t *testing.T) {
+	var stdout, stderr bytes.Buffer
+	t.Setenv("HOSTEBIN_SERVER", "http://127.0.0.1:1")
+	t.Setenv("HOSTEBIN_TOKEN", "x")
+	setUserConfigRoot(t, t.TempDir())
+	code := Run([]string{"up", "plan.html", "--title", "x"}, strings.NewReader(""), &stdout, &stderr)
+	if code != exitUsage || !strings.Contains(stderr.String(), "flags must come before files: --title") {
+		t.Fatalf("code=%d stderr=%s", code, stderr.String())
+	}
+}
