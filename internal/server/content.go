@@ -32,9 +32,6 @@ func (s *Server) serveBundleContent(w http.ResponseWriter, r *http.Request, id, 
 	if s.cfg.CSP != "off" {
 		w.Header().Set("Content-Security-Policy", s.cfg.CSP)
 	}
-	// Under subdomain hosting the bundle id *is* the origin, so a default
-	// referrer policy would hand it to every third party the page loads from.
-	w.Header().Set("Referrer-Policy", "no-referrer")
 	meta, err := s.cfg.Store.Get(id)
 	if err != nil {
 		http.NotFound(w, r)
@@ -85,6 +82,9 @@ func (s *Server) serveFile(w http.ResponseWriter, r *http.Request, meta *store.B
 	raw := r.URL.Query().Get("raw") == "1"
 	ext := strings.ToLower(path.Ext(name))
 	if !raw && (ext == ".md" || ext == ".markdown") {
+		if s.cfg.CSP == DefaultCSP {
+			w.Header().Set("Content-Security-Policy", s.renderer.markdownCSP)
+		}
 		w.Header().Set("Content-Type", "text/html; charset=utf-8")
 		if err := s.renderer.renderMarkdown(w, name, f, s.themeCSS(meta.OwnerID)); err != nil {
 			s.cfg.Logger.Error().Err(err).Msg("render markdown")
@@ -100,8 +100,17 @@ func (s *Server) serveFile(w http.ResponseWriter, r *http.Request, meta *store.B
 		w.Header().Set("Content-Disposition", fmt.Sprintf("attachment; filename=%q", path.Base(name)))
 	}
 	w.Header().Set("Content-Type", contentType)
-	http.ServeContent(w, r, path.Base(name), info.ModTime(), f)
+	http.ServeContent(noStoreWriter{w}, r, path.Base(name), info.ModTime(), f)
 }
+
+type noStoreWriter struct{ http.ResponseWriter }
+
+func (w noStoreWriter) WriteHeader(status int) {
+	w.Header().Set("Cache-Control", "no-store")
+	w.ResponseWriter.WriteHeader(status)
+}
+
+func (w noStoreWriter) Unwrap() http.ResponseWriter { return w.ResponseWriter }
 
 func (s *Server) serveListing(w http.ResponseWriter, _ *http.Request, meta *store.BundleMeta) {
 	w.Header().Set("Content-Type", "text/html; charset=utf-8")

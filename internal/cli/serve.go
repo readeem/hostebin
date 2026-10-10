@@ -58,11 +58,6 @@ func runServe(args []string, stderr io.Writer) int {
 		logger.Error().Err(err).Msg("initialize storage")
 		return exitNetwork
 	}
-	bootstrapToken, err := loadBootstrapToken(st.DataDir(), cfg.Token)
-	if err != nil {
-		logger.Error().Err(err).Msg("initialize token")
-		return exitNetwork
-	}
 	userStore, err := filestore.Open(st.DataDir())
 	if err != nil {
 		logger.Error().Err(err).Msg("initialize users")
@@ -70,9 +65,7 @@ func runServe(args []string, stderr io.Writer) int {
 	}
 	defer userStore.Close()
 	userService := users.NewService(userStore)
-	// Bootstrap mints the admin token itself when there is nothing to adopt, so
-	// generation lives in exactly one place; here we only persist and announce it.
-	adminID, generatedToken, err := userService.Bootstrap(context.Background(), bootstrapToken)
+	adminID, generatedToken, err := bootstrapUsers(st.DataDir(), cfg.Token, userService)
 	if err != nil {
 		logger.Error().Err(err).Msg("bootstrap admin user")
 		return exitNetwork
@@ -82,7 +75,7 @@ func runServe(args []string, stderr io.Writer) int {
 			logger.Error().Err(err).Msg("persist generated token")
 			return exitNetwork
 		}
-		logger.Info().Str("token", generatedToken).Str("user", "admin").Str("path", filepath.Join(st.DataDir(), "token")).Msg("generated upload token")
+		logger.Info().Str("user", "admin").Str("path", filepath.Join(st.DataDir(), "token")).Msg("generated upload token; read it from the token file")
 	}
 	adopted, err := st.AdoptUnownedBundles(adminID)
 	if err != nil {
@@ -185,8 +178,16 @@ func runServe(args []string, stderr io.Writer) int {
 			if endpoint.BaseURL != "" {
 				handler = server.WithBaseURL(endpoint.BaseURL, handler)
 			}
+		} else {
+			handler = server.WithPrivacyHeaders(handler)
 		}
-		httpServer := &http.Server{Handler: handler, ReadHeaderTimeout: 10 * time.Second}
+		httpServer := &http.Server{
+			Handler:           handler,
+			ReadHeaderTimeout: 10 * time.Second,
+			ReadTimeout:       60 * time.Second,
+			IdleTimeout:       60 * time.Second,
+			WriteTimeout:      5 * time.Minute,
+		}
 		servers = append(servers, httpServer)
 		logListening(logger, endpoint, cfg, st.DataDir(), maxUpload, defaultTTL, csp, i == 0)
 
@@ -258,6 +259,22 @@ func httpListenAddr(host string, port int) (string, error) {
 		return "", nil
 	}
 	return net.JoinHostPort(host, strconv.Itoa(port)), nil
+}
+
+func bootstrapUsers(dataDir, configuredToken string, service *users.Service) (string, string, error) {
+	ctx := context.Background()
+	all, err := service.ListUsers(ctx)
+	if err != nil {
+		return "", "", err
+	}
+	var token string
+	if len(all) == 0 {
+		token, err = loadBootstrapToken(dataDir, configuredToken)
+		if err != nil {
+			return "", "", err
+		}
+	}
+	return service.Bootstrap(ctx, token)
 }
 
 func loadBootstrapToken(dataDir, configuredToken string) (string, error) {

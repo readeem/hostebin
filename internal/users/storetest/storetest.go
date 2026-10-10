@@ -82,15 +82,13 @@ func Run(t *testing.T, newStore func(*testing.T) users.Store) {
 		}
 		var wg sync.WaitGroup
 		for i := range 16 {
-			wg.Add(1)
-			go func() {
-				defer wg.Done()
+			wg.Go(func() {
 				id := fmt.Sprintf("t_%d", i)
 				digest := users.HashToken(id)
 				_ = store.SetToken(ctx, users.Token{ID: id, UserID: user.ID, Label: id, Digest: digest, CreatedAt: now})
 				_, _, _ = store.LookupToken(ctx, digest)
 				_, _ = store.GetTokenForUser(ctx, user.ID)
-			}()
+			})
 		}
 		wg.Wait()
 		token, err := store.GetTokenForUser(ctx, user.ID)

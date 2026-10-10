@@ -26,6 +26,8 @@ jobs:
       - name: Test without embedded Tailscale
         run: go test -tags notsnet ./...
       - run: go test -race ./...
+      - run: go run golang.org/x/vuln/cmd/govulncheck@v1.8.0 ./...
+      - run: go run golang.org/x/vuln/cmd/govulncheck@v1.8.0 -tags notsnet ./...
 
       - name: Validate .goreleaser.yaml
         uses: goreleaser/goreleaser-action@v7
@@ -92,6 +94,7 @@ jobs:
           context: .
           platforms: linux/amd64,linux/arm64
           push: true
+          pull: true
           tags: ${{ steps.meta.outputs.tags }}
           labels: ${{ steps.meta.outputs.labels }}
           build-args: |

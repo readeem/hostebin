@@ -1,4 +1,4 @@
-FROM --platform=$BUILDPLATFORM golang:1.26-alpine AS build
+FROM --platform=$BUILDPLATFORM golang:1.27.2-alpine AS build
 
 WORKDIR /src
 COPY go.mod go.sum ./
@@ -24,7 +24,8 @@ COPY --from=build /out/hostebin /hostebin
 COPY --from=build --chown=65532:65532 /out/data /data
 
 ENV XDG_CONFIG_HOME=/data/config \
-    XDG_DATA_HOME=/data
+    XDG_DATA_HOME=/data \
+    HOSTEBIN_HOST=0.0.0.0
 
 VOLUME ["/data"]
 EXPOSE 8080
