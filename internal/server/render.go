@@ -2,7 +2,9 @@ package server
 
 import (
 	"bytes"
+	"crypto/sha256"
 	"embed"
+	"encoding/base64"
 	"fmt"
 	"html/template"
 	"io"
@@ -17,11 +19,16 @@ import (
 //go:embed assets/*
 var assets embed.FS
 
+const highlightIntegrity = "sha384-RH2xi4eIQ/gjtbs9fUXM68sLSi99C7ZWBRX1vDrVv6GQXRibxXLbwO2NGZB74MbU"
+
+const markdownScript = `addEventListener("DOMContentLoaded",()=>{for(const p of document.querySelectorAll("pre, table"))p.tabIndex=0;for(const c of document.querySelectorAll("li>input[type=checkbox]"))c.ariaLabel=c.checked?"Done":"To do";globalThis.hljs?.configure({cssSelector:"pre code[class*=language-]"});globalThis.hljs?.highlightAll()})`
+
 type renderer struct {
-	markdown goldmark.Markdown
-	md       *template.Template
-	dir      *template.Template
-	css      template.CSS
+	markdown    goldmark.Markdown
+	md          *template.Template
+	dir         *template.Template
+	css         template.CSS
+	markdownCSP string
 }
 
 func newRenderer() (*renderer, error) {
@@ -37,6 +44,7 @@ func newRenderer() (*renderer, error) {
 	if err != nil {
 		return nil, err
 	}
+	scriptHash := sha256.Sum256([]byte(markdownScript))
 	return &renderer{
 		markdown: goldmark.New(
 			goldmark.WithExtensions(extension.GFM),
@@ -44,6 +52,7 @@ func newRenderer() (*renderer, error) {
 			goldmark.WithRendererOptions(html.WithUnsafe()),
 		),
 		md: md, dir: dir, css: template.CSS(css),
+		markdownCSP: DefaultCSP + "; script-src '" + highlightIntegrity + "' 'sha256-" + base64.StdEncoding.EncodeToString(scriptHash[:]) + "'",
 	}, nil
 }
 
@@ -58,6 +67,7 @@ func (r *renderer) renderMarkdown(dst io.Writer, name string, src io.Reader, the
 	}
 	return r.md.ExecuteTemplate(dst, "md.html.tmpl", map[string]any{
 		"Title": path.Base(name), "CSS": r.css, "Theme": template.CSS(theme), "Body": template.HTML(body.String()),
+		"HighlightIntegrity": highlightIntegrity, "Script": template.JS(markdownScript),
 	})
 }
 

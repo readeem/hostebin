@@ -13,6 +13,8 @@ on:
       - LICENSE
       - skills/**
   workflow_dispatch:
+  schedule:
+    - cron: "17 6 * * 1"
 
 permissions:
   contents: read
@@ -74,3 +76,15 @@ jobs:
           go-version-file: go.mod
           cache: true
       - run: go test -race ./...
+
+  vulnerabilities:
+    name: reachable vulnerabilities
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v7
+      - uses: actions/setup-go@v7
+        with:
+          go-version-file: go.mod
+          cache: true
+      - run: go run golang.org/x/vuln/cmd/govulncheck@v1.8.0 ./...
+      - run: go run golang.org/x/vuln/cmd/govulncheck@v1.8.0 -tags notsnet ./...

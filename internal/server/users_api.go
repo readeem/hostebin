@@ -1,6 +1,7 @@
 package server
 
 import (
+	"bytes"
 	"encoding/json"
 	"errors"
 	"io"
@@ -220,10 +221,18 @@ func (s *Server) revokeToken(w http.ResponseWriter, r *http.Request, principal u
 }
 
 func decodeJSON(w http.ResponseWriter, r *http.Request, dst any) bool {
-	dec := json.NewDecoder(r.Body)
+	r.Body = http.MaxBytesReader(w, r.Body, 8<<10)
+	body, err := io.ReadAll(r.Body)
+	if err != nil {
+		if _, ok := errors.AsType[*http.MaxBytesError](err); ok {
+			writeError(w, http.StatusRequestEntityTooLarge, "JSON body must be at most 8 KiB")
+		} else {
+			writeError(w, http.StatusBadRequest, "invalid JSON body")
+		}
+		return false
+	}
+	dec := json.NewDecoder(bytes.NewReader(body))
 	dec.DisallowUnknownFields()
-	// An absent body means "all defaults" — `curl -X PUT .../token` should not
-	// have to send `{}` just to accept them.
 	if err := dec.Decode(dst); errors.Is(err, io.EOF) {
 		return true
 	} else if err != nil {
@@ -255,7 +264,7 @@ func writeUsersError(w http.ResponseWriter, err error) {
 		writeError(w, http.StatusNotFound, err.Error())
 	case errors.Is(err, users.ErrDuplicateName), errors.Is(err, users.ErrLastAdmin), errors.Is(err, users.ErrLastAdminToken):
 		writeError(w, http.StatusConflict, err.Error())
-	case errors.Is(err, users.ErrInvalidName), errors.Is(err, users.ErrInvalidRole):
+	case errors.Is(err, users.ErrInvalidName), errors.Is(err, users.ErrInvalidRole), errors.Is(err, users.ErrInvalidLabel):
 		writeError(w, http.StatusBadRequest, err.Error())
 	default:
 		writeError(w, http.StatusInternalServerError, err.Error())

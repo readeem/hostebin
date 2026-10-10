@@ -70,7 +70,7 @@ curl -fsSL https://github.com/readeem/hostebin/releases/latest/download/hostebin
 <tr><th>Docker</th><td>
 
 ```sh
-docker run --rm -p 8080:8080 -v hostebin-data:/data ghcr.io/readeem/hostebin
+docker run --rm -p 127.0.0.1:8080:8080 -v hostebin-data:/data ghcr.io/readeem/hostebin
 ```
 
 </td></tr>
@@ -86,14 +86,18 @@ download with `sha256sum -c checksums.txt --ignore-missing`.
 
 ## Quick start
 
-**1. Start a server** (any machine that both you and your agent can reach):
+**1. Start a local server:**
 
 ```sh
 hostebin serve
 ```
 
 On first run it generates a token, stores it in the data directory with mode `0600`,
-and logs it once.
+and logs the token-file location. Read the token from that file; it is never logged.
+Bootstrap settings and the token file only initialize an empty user store. After
+rotation, keep the replacement securely: restarts preserve the stored token and
+ignore bootstrap credentials. The plain HTTP listener defaults to loopback; use
+HTTPS or a private tailnet for remote access.
 
 **2. Point the client at it:**
 
@@ -184,6 +188,8 @@ Markdown file, then a generated listing.
 
 ## Users and access tokens
 
+User-management JSON bodies are limited to 8 KiB and token labels to 256 bytes.
+
 The token created on first start belongs to the `admin` user. Admins can create and
 delete users, disable or enable accounts, and manage anyone's token. Regular users
 can rotate and revoke only their own token.
@@ -226,7 +232,7 @@ names:
 {
   "server": "https://hostebin.example.com",
   "token": "replace-me",
-  "host": "",
+  "host": "127.0.0.1",
   "port": 8080,
   "data": "/home/me/.local/share/hostebin",
   "base-url": "",
@@ -255,8 +261,8 @@ dir>/hostebin/data` elsewhere.
 ## Running a server
 
 ```sh
-# plain HTTP, the default
-hostebin serve --host 0.0.0.0 --port 8080 --data /var/lib/hostebin
+# plain HTTP on loopback, for local use or a local HTTPS proxy
+hostebin serve --port 8080 --data /var/lib/hostebin
 
 # your own certificate, with or without plain HTTP alongside
 hostebin serve --port 0 --tls-addr :8443 --tls-cert cert.pem --tls-key key.pem
@@ -274,12 +280,22 @@ first and logs an HTTP fallback if HTTPS is not enabled for the tailnet.
 
 `--base-url` overrides the URL returned by every listener. Without it, Tailscale and
 ACME use their known DNS names and other listeners derive links from the request. Behind
-a reverse proxy, forward the original `Host` and set `X-Forwarded-Proto`.
+a reverse proxy, set a canonical `--base-url`, validate `Host`, and overwrite
+`X-Forwarded-Proto` at the proxy. Public access must use HTTPS for both content and
+the API. Keep the plain HTTP backend reachable only by the proxy, or disable it
+with `--port 0` when using a TLS listener. The plain Docker profile publishes its
+HTTP port on loopback; private tailnet HTTP is encrypted by Tailscale transport.
+Existing configs with `"host": ""` still bind all interfaces; set `"host"` to
+`"127.0.0.1"` for a proxy on the same machine. Containers explicitly bind all
+container interfaces so the proxy or loopback-published port can reach them.
 
 Useful server settings: `--max-upload` (default `32MiB`), `--max-files` (default `64`),
 `--default-ttl` (default `never`), `--csp` (`off` disables it), `--theme` (see
 [Themes](#themes)). Expired bundles 404
 immediately; a sweep at startup and every ten minutes reclaims their files.
+Headers must arrive within ten seconds, complete requests within 60 seconds, and
+responses within five minutes; idle keep-alive connections close after 60 seconds.
+Uploads must fit the read deadline as well as `--max-upload`.
 
 ### Path-based or host-based routing
 
@@ -336,6 +352,15 @@ The trade-off for the origin separation is that the id moves from the URL path i
 the hostname, so it becomes visible to DNS resolvers and to anyone on the network
 path via TLS SNI. Bundle responses send `Referrer-Policy: no-referrer` under both
 modes, so the id is not handed to third-party origins the page loads from.
+Responses also send `Cache-Control: no-store` and
+`X-Robots-Tag: noindex, nofollow, nosnippet`. Configure any proxy or CDN to honor
+these headers and purge previously cached copies when adopting this policy.
+Deletion cannot revoke copies a recipient has already saved.
+
+The default Markdown renderer permits only its own hashed script and the pinned,
+integrity-checked Highlight.js asset. Scripts embedded in Markdown are blocked;
+a custom `--csp` overrides this policy. Uploaded HTML retains the general content
+policy described above.
 
 #### Dokploy + Cloudflare
 
@@ -410,7 +435,7 @@ sudo systemctl cat hostebin      # data lives in /var/lib/hostebin
 ### Containers
 
 ```sh
-docker run --rm -p 8080:8080 -v hostebin-data:/data ghcr.io/readeem/hostebin
+docker run --rm -p 127.0.0.1:8080:8080 -v hostebin-data:/data ghcr.io/readeem/hostebin
 
 HOSTEBIN_TOKEN=choose-a-secret docker compose --profile plain up
 HOSTEBIN_TS_AUTH_KEY=tskey-auth-... HOSTEBIN_TOKEN=choose-a-secret \
@@ -561,7 +586,8 @@ multipart uploads use `title`, `entry`, and `ttl` fields.
 
 Hosted files are untrusted. The server never uses cookie authentication, sends
 `X-Content-Type-Options: nosniff`, and serves unknown extensions as downloadable
-`application/octet-stream`. Bundle responses carry this default CSP:
+`application/octet-stream`. Uploaded files carry this default CSP; rendered
+Markdown additionally restricts scripts to its two approved hashes:
 
 ```text
 default-src 'self' data: blob: https: 'unsafe-inline' 'unsafe-eval'; connect-src 'self' https:; form-action 'none'; frame-ancestors 'none'

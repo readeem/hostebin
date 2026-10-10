@@ -72,6 +72,11 @@ lint:
 check: vet test
     @test -z "$(gofmt -l .)" || { echo "gofmt needed:"; gofmt -l .; exit 1; }
 
+# Scan both build variants for reachable vulnerabilities
+vulncheck:
+    go run golang.org/x/vuln/cmd/govulncheck@v1.8.0 ./...
+    go run golang.org/x/vuln/cmd/govulncheck@v1.8.0 -tags notsnet ./...
+
 # Validate .goreleaser.yaml
 release-check:
     goreleaser check

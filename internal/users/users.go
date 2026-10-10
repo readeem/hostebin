@@ -30,6 +30,7 @@ var (
 	ErrUnauthorized   = errors.New("valid bearer token required")
 	ErrInvalidName    = errors.New("invalid user name")
 	ErrInvalidRole    = errors.New("invalid user role")
+	ErrInvalidLabel   = errors.New("token label must be at most 256 bytes")
 	ErrLastAdmin      = errors.New("cannot remove the last admin")
 	ErrLastAdminToken = errors.New("cannot revoke the last token of the last admin")
 )
@@ -137,8 +138,8 @@ func (s *Service) Authenticate(ctx context.Context, plaintext string) (Principal
 	return Principal{UserID: user.ID, Name: user.Name, Role: user.Role, TokenID: token.ID, TokenLabel: token.Label}, nil
 }
 
-// Bootstrap creates the first admin and ensures a configured or legacy token
-// remains valid. generated is non-empty only when Bootstrap generated the secret.
+// Bootstrap initializes an empty store with an admin and leaves existing users
+// and tokens unchanged. generated is non-empty only for a newly minted secret.
 func (s *Service) Bootstrap(ctx context.Context, plaintext string) (adminID, generated string, err error) {
 	s.mu.Lock()
 	defer s.mu.Unlock()
@@ -179,28 +180,6 @@ func (s *Service) Bootstrap(ctx context.Context, plaintext string) (adminID, gen
 	}
 	if admin.ID == "" {
 		return "", "", ErrLastAdmin
-	}
-	if plaintext != "" {
-		d := HashToken(plaintext)
-		_, owner, lookupErr := s.store.LookupToken(ctx, d)
-		if lookupErr == nil && owner.Role != RoleAdmin {
-			if err := s.store.DeleteTokenForUser(ctx, owner.ID); err != nil {
-				return "", "", err
-			}
-			lookupErr = ErrTokenNotFound
-		}
-		if errors.Is(lookupErr, ErrTokenNotFound) {
-			tokenID, err := newID("t_")
-			if err != nil {
-				return "", "", err
-			}
-			token := Token{ID: tokenID, UserID: admin.ID, Label: "bootstrap", Digest: d, CreatedAt: s.now()}
-			if err := s.store.SetToken(ctx, token); err != nil {
-				return "", "", err
-			}
-		} else if lookupErr != nil {
-			return "", "", lookupErr
-		}
 	}
 	return admin.ID, "", nil
 }
@@ -245,9 +224,10 @@ func (s *Service) CreateUser(ctx context.Context, name string, role Role, label 
 	return user, token, plaintext, nil
 }
 
-// mintToken builds an unsaved token and its plaintext. It does not touch the
-// store, so callers stay free to persist it however they need to.
 func (s *Service) mintToken(userID, label, defaultLabel string, ttl time.Duration) (Token, string, error) {
+	if len(label) > 256 {
+		return Token{}, "", ErrInvalidLabel
+	}
 	plaintext, digest, err := NewToken()
 	if err != nil {
 		return Token{}, "", err

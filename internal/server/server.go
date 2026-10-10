@@ -97,10 +97,8 @@ func New(cfg Config) (*Server, error) {
 	mux.HandleFunc("PUT /api/v1/users/{id}/theme", s.auth(s.setTheme))
 	mux.HandleFunc("DELETE /api/v1/users/{id}/theme", s.auth(s.removeTheme))
 
-	s.handler = http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+	s.handler = WithPrivacyHeaders(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		w.Header().Set("X-Content-Type-Options", "nosniff")
-		// A request that arrives on a bundle subdomain never reaches the mux, so
-		// the API is unreachable from bundle content even if a page tries.
 		if id, ok := s.bundleHostID(r.Host); ok {
 			if hasTraversalSegment(r.URL.Path) {
 				http.Error(w, "invalid bundle path", http.StatusBadRequest)
@@ -119,11 +117,21 @@ func New(cfg Config) (*Server, error) {
 			return
 		}
 		mux.ServeHTTP(w, r)
-	})
+	}))
 	return s, nil
 }
 
 func (s *Server) Handler() http.Handler { return s.handler }
+
+// WithPrivacyHeaders sets cache, indexing, and referrer policies on responses.
+func WithPrivacyHeaders(next http.Handler) http.Handler {
+	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		w.Header().Set("Cache-Control", "no-store")
+		w.Header().Set("X-Robots-Tag", "noindex, nofollow, nosnippet")
+		w.Header().Set("Referrer-Policy", "no-referrer")
+		next.ServeHTTP(w, r)
+	})
+}
 
 func NormalizeBundleHost(pattern string) (string, error) {
 	h := strings.ToLower(strings.TrimSpace(pattern))

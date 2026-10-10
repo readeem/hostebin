@@ -60,9 +60,8 @@ func (s *Server) serveTheme(w http.ResponseWriter, r *http.Request, ownerID stri
 	css := s.themeCSS(ownerID)
 	sum := sha256.Sum256(css)
 	w.Header().Set("Content-Type", "text/css; charset=utf-8")
-	w.Header().Set("Cache-Control", "no-cache")
 	w.Header().Set("ETag", `"`+hex.EncodeToString(sum[:8])+`"`)
-	http.ServeContent(w, r, "", time.Time{}, bytes.NewReader(css))
+	http.ServeContent(noStoreWriter{w}, r, "", time.Time{}, bytes.NewReader(css))
 }
 
 func (s *Server) setTheme(w http.ResponseWriter, r *http.Request, principal users.Principal) {

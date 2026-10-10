@@ -2,6 +2,8 @@ package server
 
 import (
 	"bytes"
+	"crypto/sha256"
+	"encoding/base64"
 	"encoding/json"
 	"fmt"
 	"io"
@@ -19,6 +21,7 @@ import (
 	"github.com/readeem/hostebin/internal/users"
 	"github.com/readeem/hostebin/internal/users/filestore"
 	"github.com/rs/zerolog"
+	"golang.org/x/crypto/acme/autocert"
 )
 
 func testServer(t *testing.T, maxUpload int64, maxFiles int) (*store.Store, *httptest.Server) {
@@ -205,6 +208,27 @@ func TestMarkdownRawListingAndExpired(t *testing.T) {
 	if !strings.Contains(string(html), string(theme.Default)) {
 		t.Fatalf("markdown page does not inline the theme: %q", html)
 	}
+	_, scriptAndRest, ok := strings.Cut(string(html), "<script>")
+	if !ok {
+		t.Fatal("missing renderer script")
+	}
+	script, _, ok := strings.Cut(scriptAndRest, "</script>")
+	if !ok {
+		t.Fatal("unterminated renderer script")
+	}
+	hash := sha256.Sum256([]byte(script))
+	csp := rendered.Header.Get("Content-Security-Policy")
+	_, scriptPolicy, ok := strings.Cut(csp, "; script-src ")
+	if !ok || !strings.Contains(scriptPolicy, "'sha256-"+base64.StdEncoding.EncodeToString(hash[:])+"'") || !strings.Contains(scriptPolicy, "'"+highlightIntegrity+"'") {
+		t.Fatalf("renderer script hashes absent from CSP: %q", csp)
+	}
+	if strings.Contains(scriptPolicy, "https:") || strings.Contains(scriptPolicy, "unsafe-") {
+		t.Fatalf("unrestricted renderer script policy: %q", scriptPolicy)
+	}
+	if !strings.Contains(string(html), `integrity="`+highlightIntegrity+`" crossorigin="anonymous"`) {
+		t.Fatal("missing CDN integrity protection")
+	}
+	assertPrivacyHeaders(t, rendered)
 	raw, _ := http.Get(md.EntryURL + "?raw=1")
 	rawBody, _ := io.ReadAll(raw.Body)
 	raw.Body.Close()
@@ -814,4 +838,144 @@ func TestUserThemesFollowBundleOwner(t *testing.T) {
 	if strings.Contains(get(ts.URL+"/b/"+bobs.ID+"/.hostebin/theme.css"), "#00ff00") {
 		t.Fatal("removed theme still served")
 	}
+}
+
+func TestUserManagementInputLimits(t *testing.T) {
+	_, ts := testServer(t, 1024, 4)
+	created := authRequest(t, http.MethodPost, ts.URL+"/api/v1/users", "test-token", `{"name":"limited"}`)
+	var user struct {
+		User      users.User `json:"user"`
+		Plaintext string     `json:"plaintext"`
+	}
+	if err := json.NewDecoder(created.Body).Decode(&user); err != nil {
+		t.Fatal(err)
+	}
+	created.Body.Close()
+	if created.StatusCode != http.StatusCreated {
+		t.Fatal(created.Status)
+	}
+	assertPrivacyHeaders(t, created)
+	for _, tc := range []struct {
+		name, method, path, token, body string
+		status                          int
+	}{
+		{"create", http.MethodPost, "/api/v1/users", "test-token", `{"name":"oversized","label":"` + strings.Repeat("x", 2<<20) + `"}`, http.StatusRequestEntityTooLarge},
+		{"patch", http.MethodPatch, "/api/v1/users/" + user.User.ID, "test-token", `{"disabled":true}` + strings.Repeat(" ", 8<<10), http.StatusRequestEntityTooLarge},
+		{"rotate", http.MethodPut, "/api/v1/users/" + user.User.ID + "/token", user.Plaintext, `{"label":"` + strings.Repeat("x", 2<<20) + `"}`, http.StatusRequestEntityTooLarge},
+		{"chunked", http.MethodPut, "/api/v1/users/" + user.User.ID + "/token", user.Plaintext, `{}` + strings.Repeat(" ", 8<<10), http.StatusRequestEntityTooLarge},
+		{"create label", http.MethodPost, "/api/v1/users", "test-token", `{"name":"longlabel","label":"` + strings.Repeat("x", 257) + `"}`, http.StatusBadRequest},
+		{"rotate label", http.MethodPut, "/api/v1/users/" + user.User.ID + "/token", user.Plaintext, `{"label":"` + strings.Repeat("é", 129) + `"}`, http.StatusBadRequest},
+	} {
+		t.Run(tc.name, func(t *testing.T) {
+			req, err := http.NewRequest(tc.method, ts.URL+tc.path, strings.NewReader(tc.body))
+			if err != nil {
+				t.Fatal(err)
+			}
+			req.Header.Set("Authorization", "Bearer "+tc.token)
+			if tc.name == "chunked" {
+				req.ContentLength = -1
+			}
+			resp, err := http.DefaultClient.Do(req)
+			if err != nil {
+				t.Fatal(err)
+			}
+			defer resp.Body.Close()
+			if resp.StatusCode != tc.status {
+				t.Fatalf("status = %d, want %d", resp.StatusCode, tc.status)
+			}
+			who := authRequest(t, http.MethodGet, ts.URL+"/api/v1/whoami", user.Plaintext, "")
+			who.Body.Close()
+			if who.StatusCode != http.StatusOK {
+				t.Fatalf("rejected request changed authentication: %d", who.StatusCode)
+			}
+		})
+	}
+}
+
+func TestPrivacyHeadersAcrossRoutes(t *testing.T) {
+	for _, hostMode := range []bool{false, true} {
+		t.Run(fmt.Sprintf("host=%t", hostMode), func(t *testing.T) {
+			var ts *httptest.Server
+			if hostMode {
+				_, ts = bundleHostServer(t)
+			} else {
+				_, ts = testServer(t, 4096, 4)
+			}
+			_, bundle := rawUpload(t, ts, "note.md", "# Private", "test-token")
+			for _, tc := range []struct {
+				path, rangeHeader string
+				status            int
+			}{
+				{"/b/" + bundle.ID + "/", "", http.StatusOK},
+				{"/b/" + bundle.ID + "/note.md?raw=1", "", http.StatusOK},
+				{"/b/" + bundle.ID + "/note.md?raw=1", "bytes=0-1", http.StatusPartialContent},
+				{"/b/" + bundle.ID + "/note.md?raw=1", "bytes=999-", http.StatusRequestedRangeNotSatisfiable},
+				{"/b/" + bundle.ID + "/missing", "", http.StatusNotFound},
+				{"/b/" + bundle.ID + "/.hostebin/theme.css", "", http.StatusOK},
+				{"/api/v1/users", "", http.StatusUnauthorized},
+			} {
+				req, err := http.NewRequest(http.MethodGet, ts.URL+tc.path, nil)
+				if err != nil {
+					t.Fatal(err)
+				}
+				if tc.rangeHeader != "" {
+					req.Header.Set("Range", tc.rangeHeader)
+				}
+				if hostMode && strings.HasPrefix(tc.path, "/b/") {
+					req.Host = bundle.ID + ".paste.example.com"
+					req.URL.Path = strings.TrimPrefix(req.URL.Path, "/b/"+bundle.ID)
+				}
+				resp, err := http.DefaultTransport.RoundTrip(req)
+				if err != nil {
+					t.Fatal(err)
+				}
+				resp.Body.Close()
+				if resp.StatusCode != tc.status {
+					t.Fatalf("%s status = %d, want %d", tc.path, resp.StatusCode, tc.status)
+				}
+				assertPrivacyHeaders(t, resp)
+			}
+			if hostMode {
+				req, _ := http.NewRequest(http.MethodGet, ts.URL+"/b/"+bundle.ID+"/", nil)
+				resp, err := http.DefaultTransport.RoundTrip(req)
+				if err != nil {
+					t.Fatal(err)
+				}
+				resp.Body.Close()
+				if resp.StatusCode != http.StatusMovedPermanently {
+					t.Fatal(resp.Status)
+				}
+				assertPrivacyHeaders(t, resp)
+			}
+		})
+	}
+}
+
+func assertPrivacyHeaders(t *testing.T, resp *http.Response) {
+	t.Helper()
+	for key, want := range map[string]string{
+		"Cache-Control":   "no-store",
+		"X-Robots-Tag":    "noindex, nofollow, nosnippet",
+		"Referrer-Policy": "no-referrer",
+	} {
+		if got := resp.Header.Get(key); got != want {
+			t.Errorf("%s: %s = %q, want %q", resp.Request.URL, key, got, want)
+		}
+	}
+}
+
+func TestPrivacyHeadersOnACMERedirect(t *testing.T) {
+	manager := &autocert.Manager{}
+	target := "https://files.example.com/b/capability/"
+	handler := WithPrivacyHeaders(manager.HTTPHandler(http.RedirectHandler(target, http.StatusMovedPermanently)))
+	recorder := httptest.NewRecorder()
+	req := httptest.NewRequest(http.MethodGet, "http://files.example.com/b/capability/", nil)
+	handler.ServeHTTP(recorder, req)
+	resp := recorder.Result()
+	defer resp.Body.Close()
+	resp.Request = req
+	if resp.StatusCode != http.StatusMovedPermanently || resp.Header.Get("Location") != target {
+		t.Fatalf("redirect = %d, %q", resp.StatusCode, resp.Header.Get("Location"))
+	}
+	assertPrivacyHeaders(t, resp)
 }

@@ -75,7 +75,7 @@ func TestNewConfigUsesGlobalDirectoriesAndAutogeneratesJSON(t *testing.T) {
 	if generated["max-upload"] != "32MiB" || generated["max-files"] != float64(64) {
 		t.Fatalf("generated limits = %#v, %#v", generated["max-upload"], generated["max-files"])
 	}
-	if generated["host"] != "" || generated["port"] != float64(8080) {
+	if generated["host"] != "127.0.0.1" || generated["port"] != float64(8080) {
 		t.Fatalf("generated HTTP listener = %#v, %#v", generated["host"], generated["port"])
 	}
 	if _, ok := generated["addr"]; ok {

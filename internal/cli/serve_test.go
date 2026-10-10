@@ -13,6 +13,8 @@ import (
 
 	"github.com/readeem/hostebin/internal/listen"
 	"github.com/readeem/hostebin/internal/server"
+	"github.com/readeem/hostebin/internal/users"
+	"github.com/readeem/hostebin/internal/users/filestore"
 	"github.com/rs/zerolog"
 )
 
@@ -173,5 +175,54 @@ func TestBootstrapTokenFileCompatibility(t *testing.T) {
 	}
 	if runtime.GOOS != "windows" && info.Mode().Perm() != 0o600 {
 		t.Fatalf("token mode = %v", info.Mode().Perm())
+	}
+}
+
+func TestBootstrapUsersIgnoresTokenFileAfterInitialization(t *testing.T) {
+	dataDir := t.TempDir()
+	userStore, err := filestore.Open(dataDir)
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer userStore.Close()
+	service := users.NewService(userStore)
+	adminID, _, err := bootstrapUsers(dataDir, "initial", service)
+	if err != nil {
+		t.Fatal(err)
+	}
+	_, replacement, err := service.RotateToken(t.Context(), adminID, "", 0)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if err := os.Mkdir(filepath.Join(dataDir, "token"), 0o700); err != nil {
+		t.Fatal(err)
+	}
+	if _, generated, err := bootstrapUsers(dataDir, "", service); err != nil || generated != "" {
+		t.Fatalf("initialized store consulted invalid token file: %q, %v", generated, err)
+	}
+	if _, _, err := bootstrapUsers(dataDir, "initial", service); err != nil {
+		t.Fatal(err)
+	}
+	if _, err := service.Authenticate(t.Context(), replacement); err != nil {
+		t.Fatal(err)
+	}
+}
+
+func TestRunServeDoesNotLogGeneratedToken(t *testing.T) {
+	setUserConfigRoot(t, t.TempDir())
+	dataDir := t.TempDir()
+	var stderr bytes.Buffer
+	if got := runServe([]string{"--data", dataDir, "--max-upload", "invalid"}, &stderr); got != exitUsage {
+		t.Fatalf("exit code = %d, stderr: %s", got, stderr.String())
+	}
+	token, err := os.ReadFile(filepath.Join(dataDir, "token"))
+	if err != nil {
+		t.Fatal(err)
+	}
+	if strings.Contains(stderr.String(), strings.TrimSpace(string(token))) {
+		t.Fatal("generated token leaked to startup logs")
+	}
+	if !strings.Contains(stderr.String(), "read it from the token file") {
+		t.Fatal("startup did not explain how to retrieve the token")
 	}
 }

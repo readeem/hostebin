@@ -67,6 +67,7 @@ func WithConfigAutogeneration(enabled bool) ConfigOpt {
 // The default JSON file is generated on first use unless an option disables it.
 func NewConfig(opts ...ConfigOpt) (*Config, error) {
 	cfg := &Config{
+		HTTPHost:     "127.0.0.1",
 		HTTPPort:     8080,
 		TLSAddr:      ":8443",
 		TSHostname:   "hostebin",

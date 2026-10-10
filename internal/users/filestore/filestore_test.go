@@ -3,6 +3,7 @@ package filestore_test
 import (
 	"context"
 	"errors"
+	"fmt"
 	"os"
 	"path/filepath"
 	"runtime"
@@ -120,7 +121,7 @@ func TestOpenRejectsPluralTokensField(t *testing.T) {
 	}
 }
 
-func TestConfiguredBootstrapTokenAlwaysBelongsToAdmin(t *testing.T) {
+func TestBootstrapPreservesExistingTokenOwnership(t *testing.T) {
 	store, err := filestore.Open(t.TempDir())
 	if err != nil {
 		t.Fatal(err)
@@ -131,7 +132,7 @@ func TestConfiguredBootstrapTokenAlwaysBelongsToAdmin(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	_, _, bobToken, err := service.CreateUser(context.Background(), "bob", users.RoleUser, "", 0)
+	bob, _, bobToken, err := service.CreateUser(context.Background(), "bob", users.RoleUser, "", 0)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -140,11 +141,61 @@ func TestConfiguredBootstrapTokenAlwaysBelongsToAdmin(t *testing.T) {
 		t.Fatalf("configured bootstrap = %q, %v", gotAdminID, err)
 	}
 	principal, err := service.Authenticate(context.Background(), bobToken)
-	if err != nil || !principal.IsAdmin() || principal.UserID != adminID {
+	if err != nil || principal.IsAdmin() || principal.UserID != bob.ID {
 		t.Fatalf("configured token principal = %#v, %v", principal, err)
 	}
-	if _, err := service.Authenticate(context.Background(), "old-configured-token"); !errors.Is(err, users.ErrUnauthorized) {
+	if _, err := service.Authenticate(context.Background(), "old-configured-token"); err != nil {
 		t.Fatalf("old configured token = %v", err)
+	}
+}
+
+func TestBootstrapPreservesRevocationAcrossRestart(t *testing.T) {
+	for _, revoke := range []bool{false, true} {
+		t.Run(fmt.Sprintf("revoke=%t", revoke), func(t *testing.T) {
+			dataDir := t.TempDir()
+			store, err := filestore.Open(dataDir)
+			if err != nil {
+				t.Fatal(err)
+			}
+			t.Cleanup(func() { _ = store.Close() })
+			service := users.NewService(store)
+			adminID, original, err := service.Bootstrap(t.Context(), "")
+			if err != nil {
+				t.Fatal(err)
+			}
+			_, _, replacement, err := service.CreateUser(t.Context(), "second", users.RoleAdmin, "", 0)
+			if err != nil {
+				t.Fatal(err)
+			}
+			if revoke {
+				err = service.RevokeToken(t.Context(), adminID)
+			} else {
+				_, replacement, err = service.RotateToken(t.Context(), adminID, "replacement", 0)
+			}
+			if err != nil {
+				t.Fatal(err)
+			}
+			if err := store.Close(); err != nil {
+				t.Fatal(err)
+			}
+			reopened, err := filestore.Open(dataDir)
+			if err != nil {
+				t.Fatal(err)
+			}
+			defer reopened.Close()
+			service = users.NewService(reopened)
+			for _, configured := range []string{original, "new-configured-token"} {
+				if _, generated, err := service.Bootstrap(t.Context(), configured); err != nil || generated != "" {
+					t.Fatalf("bootstrap after restart = %q, %v", generated, err)
+				}
+				if _, err := service.Authenticate(t.Context(), configured); !errors.Is(err, users.ErrUnauthorized) {
+					t.Fatalf("bootstrap credential restored after restart: %v", err)
+				}
+				if _, err := service.Authenticate(t.Context(), replacement); err != nil {
+					t.Fatalf("replacement invalid after restart: %v", err)
+				}
+			}
+		})
 	}
 }
 
